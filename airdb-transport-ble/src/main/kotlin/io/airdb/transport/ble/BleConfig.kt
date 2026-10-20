@@ -19,6 +19,20 @@ package io.airdb.transport.ble
 import java.util.UUID
 
 /**
+ * Power and latency preference for Bluetooth Low Energy advertising and scanning.
+ */
+enum class BlePowerMode(val advertiseMode: Int, val scanMode: Int) {
+    /** Balanced discovery rate with moderate radio battery consumption (Default). */
+    BALANCED(advertiseMode = 1, scanMode = 1),
+
+    /** High-frequency radio scanning and advertising for immediate discovery in emergency response. */
+    LOW_LATENCY(advertiseMode = 2, scanMode = 2),
+
+    /** Minimal battery consumption for background monitoring. */
+    LOW_POWER(advertiseMode = 0, scanMode = 0)
+}
+
+/**
  * Configuration parameters for the AirDB Bluetooth Low Energy transport layer.
  */
 data class BleConfig(
@@ -47,5 +61,8 @@ data class BleConfig(
     val sendRetryDelayMs: Long = 15L,
 
     /** Maximum retry attempts for a single in-flight GATT callback failure. */
-    val maxCallbackRetries: Int = 3
+    val maxCallbackRetries: Int = 3,
+
+    /** Radio power and discovery latency profile. Defaults to BALANCED with LOW_LATENCY option. */
+    val powerMode: BlePowerMode = BlePowerMode.BALANCED
 )

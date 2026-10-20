@@ -7,11 +7,47 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  lint-emojis:
+    name: Lint Zero-Emoji Compliance
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify zero emoji policy
+        run: |
+          python3 -c '
+          import os, re, sys
+          pattern = re.compile(r"[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002702-\U000027B0\U0001F900-\U0001F9FF\U0001FA70-\U0001FAFF]")
+          ignored = {".git", ".gradle", "build", ".build", ".idea"}
+          violations = []
+          for root, dirs, files in os.walk("."):
+              dirs[:] = [d for d in dirs if d not in ignored]
+              for f in files:
+                  p = os.path.join(root, f)
+                  try:
+                      with open(p, "r", encoding="utf-8") as fh:
+                          for idx, l in enumerate(fh, 1):
+                              m = pattern.findall(l)
+                              if m: violations.append((p, idx, m, l.strip()))
+                  except Exception: pass
+          if violations:
+              print(f"FAILED: {len(violations)} emoji violations found:")
+              for v in violations: print(f"  {v[0]}:{v[1]}: {v[2]} in: {v[3]}")
+              sys.exit(1)
+          print("SUCCESS: 0 emoji violations detected. Codebase complies with strict no-emoji policy.")
+          '
+
+  jvm-tests:
+    name: JVM & Android BLE Driver Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -21,8 +57,31 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android Platform 34
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-34"
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Run Unit Tests
+      - name: Run All JVM Unit Tests
         run: ./gradlew test --info
+
+      - name: Run Disaster Relief Simulation Demo
+        run: ./gradlew :airdb-samples:airdb-sim-demo:run
+
+  apple-tests:
+    name: Apple AirDbKit Swift Tests
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Swift Package Tests
+        run: |
+          cd AirDbKit
+          swift test
