@@ -202,9 +202,3 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
         }
     }
 }
-
-        default:
-            break
-        }
-    }
-}
