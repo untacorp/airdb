@@ -20,7 +20,7 @@ import XCTest
 final class AssemblyBufferTests: XCTestCase {
 
     func testFragmentationAndReassemblyRoundtrip() {
-        let originalPayload = Data(repeating: 0x42, count: 1500)
+        let originalPayload = Data((0..<2000).map { UInt8($0 % 256) })
         let originalPacket = AirDbPacket(
             version: 1,
             type: .deltaBatch,
@@ -29,7 +29,7 @@ final class AssemblyBufferTests: XCTestCase {
             payload: originalPayload
         )
 
-        let fragments = PacketFragmenter.fragment(packet: originalPacket, maxChunkSize: 400)
+        let fragments = PacketFragmenter.fragment(packet: originalPacket, maxChunkSize: 100)
         XCTAssertGreaterThan(fragments.count, 1)
 
         let buffer = AssemblyBuffer()

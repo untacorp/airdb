@@ -33,7 +33,7 @@ final class PacketFragmenterTests: XCTestCase {
     }
 
     func testLargePacketFragmented() {
-        let largePayload = Data(repeating: 0xAB, count: 1200)
+        let largePayload = Data((0..<2000).map { UInt8($0 % 256) })
         let packet = AirDbPacket(
             version: 1,
             type: .deltaBatch,
@@ -41,7 +41,7 @@ final class PacketFragmenterTests: XCTestCase {
             payload: largePayload
         )
 
-        let maxChunkSize = 300
+        let maxChunkSize = 100
         let fragments = PacketFragmenter.fragment(packet: packet, maxChunkSize: maxChunkSize)
 
         XCTAssertGreaterThan(fragments.count, 1)
