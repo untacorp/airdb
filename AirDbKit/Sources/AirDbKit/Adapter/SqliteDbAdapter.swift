@@ -236,13 +236,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
 
         var records: [ChangeRecord] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
-            let hlc = sqlite3_column_text(stmt, 4).flatMap { String(cString: $0) } ?? ""
-            if let since = sinceHlcTimestamp {
-                if HlcComparator.compare(hlc, since) != .orderedDescending {
-                    continue
-                }
-            }
-
+            // Strict left-to-right column extraction (0, 1, 2, 3, 4)
             let collection = sqlite3_column_text(stmt, 0).flatMap { String(cString: $0) } ?? ""
             let id = sqlite3_column_text(stmt, 1).flatMap { String(cString: $0) } ?? ""
             let rawType = UInt8(sqlite3_column_int(stmt, 2))
@@ -254,6 +248,14 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                 payloadData = Data(bytes: blobPointer, count: Int(bytes))
             } else {
                 payloadData = Data()
+            }
+
+            let hlc = sqlite3_column_text(stmt, 4).flatMap { String(cString: $0) } ?? ""
+
+            if let since = sinceHlcTimestamp {
+                if HlcComparator.compare(hlc, since) != .orderedDescending {
+                    continue
+                }
             }
 
             records.append(
@@ -311,7 +313,6 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         // Select soft-deleted tombstones to evaluate against canonical HlcComparator total order
         let selectSql = "SELECT collection, id, hlc_timestamp FROM airdb_entities WHERE type = ?"
         var selectStmt: OpaquePointer?
-        defer { sqlite3_finalize(selectStmt) }
 
         if sqlite3_prepare_v2(db, selectSql, -1, &selectStmt, nil) != SQLITE_OK {
             throw SqliteError.prepareFailed(String(cString: sqlite3_errmsg(db)))
@@ -321,32 +322,43 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
 
         var toDelete: [(collection: String, id: String)] = []
         while sqlite3_step(selectStmt) == SQLITE_ROW {
+            // Strict left-to-right extraction (0, 1, 2) to maintain SQLite row buffer integrity
+            let collection = sqlite3_column_text(selectStmt, 0).flatMap { String(cString: $0) } ?? ""
+            let id = sqlite3_column_text(selectStmt, 1).flatMap { String(cString: $0) } ?? ""
             let hlc = sqlite3_column_text(selectStmt, 2).flatMap { String(cString: $0) } ?? ""
+
             if HlcComparator.compare(hlc, pruneHlcThreshold) == .orderedAscending {
-                let collection = sqlite3_column_text(selectStmt, 0).flatMap { String(cString: $0) } ?? ""
-                let id = sqlite3_column_text(selectStmt, 1).flatMap { String(cString: $0) } ?? ""
                 toDelete.append((collection, id))
             }
         }
+        // Explicitly finalize SELECT cursor before executing mutations to release table lock
+        sqlite3_finalize(selectStmt)
 
-        // Physically delete tombstones past the threshold by primary key
+        // Physically delete tombstones past the threshold by primary key within an atomic transaction
         if !toDelete.isEmpty {
-            let deleteSql = "DELETE FROM airdb_entities WHERE collection = ? AND id = ?"
-            var deleteStmt: OpaquePointer?
-            defer { sqlite3_finalize(deleteStmt) }
+            try executeSimple("BEGIN IMMEDIATE TRANSACTION;")
+            do {
+                let deleteSql = "DELETE FROM airdb_entities WHERE collection = ? AND id = ?"
+                var deleteStmt: OpaquePointer?
+                defer { sqlite3_finalize(deleteStmt) }
 
-            if sqlite3_prepare_v2(db, deleteSql, -1, &deleteStmt, nil) != SQLITE_OK {
-                throw SqliteError.prepareFailed(String(cString: sqlite3_errmsg(db)))
-            }
-
-            for item in toDelete {
-                sqlite3_reset(deleteStmt)
-                sqlite3_clear_bindings(deleteStmt)
-                sqlite3_bind_text(deleteStmt, 1, item.collection, -1, sqliteTransient)
-                sqlite3_bind_text(deleteStmt, 2, item.id, -1, sqliteTransient)
-                if sqlite3_step(deleteStmt) != SQLITE_DONE {
-                    throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
+                if sqlite3_prepare_v2(db, deleteSql, -1, &deleteStmt, nil) != SQLITE_OK {
+                    throw SqliteError.prepareFailed(String(cString: sqlite3_errmsg(db)))
                 }
+
+                for item in toDelete {
+                    sqlite3_reset(deleteStmt)
+                    sqlite3_clear_bindings(deleteStmt)
+                    sqlite3_bind_text(deleteStmt, 1, item.collection, -1, sqliteTransient)
+                    sqlite3_bind_text(deleteStmt, 2, item.id, -1, sqliteTransient)
+                    if sqlite3_step(deleteStmt) != SQLITE_DONE {
+                        throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
+                    }
+                }
+                try executeSimple("COMMIT TRANSACTION;")
+            } catch {
+                try? executeSimple("ROLLBACK TRANSACTION;")
+                throw error
             }
         }
     }
