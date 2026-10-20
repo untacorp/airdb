@@ -294,11 +294,29 @@ class SqliteDbAdapter(
 
     override suspend fun compact(pruneHlcThreshold: String) = withContext(Dispatchers.IO) {
         mutex.withLock {
-            val sql = "DELETE FROM airdb_entities WHERE type = ? AND hlc_timestamp < ?"
-            connection.prepareStatement(sql).use { stmt ->
-                stmt.setInt(1, MutationType.DELETE.ordinal)
-                stmt.setString(2, pruneHlcThreshold)
-                stmt.executeUpdate()
+            val toDelete = mutableListOf<Pair<String, String>>()
+            val selectSql = "SELECT collection, id, hlc_timestamp FROM airdb_entities WHERE type = ?"
+            connection.prepareStatement(selectSql).use { selectStmt ->
+                selectStmt.setInt(1, MutationType.DELETE.ordinal)
+                selectStmt.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        val hlc = rs.getString("hlc_timestamp")
+                        if (HlcComparator.compare(hlc, pruneHlcThreshold) < 0) {
+                            toDelete.add(rs.getString("collection") to rs.getString("id"))
+                        }
+                    }
+                }
+            }
+
+            if (toDelete.isNotEmpty()) {
+                val deleteSql = "DELETE FROM airdb_entities WHERE collection = ? AND id = ?"
+                connection.prepareStatement(deleteSql).use { deleteStmt ->
+                    for ((collection, id) in toDelete) {
+                        deleteStmt.setString(1, collection)
+                        deleteStmt.setString(2, id)
+                        deleteStmt.executeUpdate()
+                    }
+                }
             }
         }
         Unit
