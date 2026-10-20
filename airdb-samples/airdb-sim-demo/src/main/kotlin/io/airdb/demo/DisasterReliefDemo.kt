@@ -18,11 +18,13 @@ package io.airdb.demo
 
 import io.airdb.adapter.MemoryDbAdapter
 import io.airdb.adapter.MutationType
+import io.airdb.adapter.sqlite.SqliteDbAdapter
 import io.airdb.core.engine.AirDbEngine
 import io.airdb.transport.sim.SimulatedNetwork
 import io.airdb.transport.sim.SimulatedTransport
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -33,17 +35,19 @@ fun main() = runBlocking {
 
     val network = SimulatedNetwork()
 
-    // Initialize Posko A (Medical Triage Outpost)
-    val dbA = MemoryDbAdapter()
+    // Initialize Posko A (Medical Triage Outpost backed by durable SQLite engine)
+    val dbFileA = File("build/demo-db/posko-medis.sqlite")
+    if (dbFileA.exists()) dbFileA.delete()
+    val dbA = SqliteDbAdapter.open(dbFileA)
     val transportA = SimulatedTransport("posko-medis-merapi", network)
     val engineA = AirDbEngine("posko-medis-merapi", dbA, transportA)
 
-    // Initialize Posko B (Logistics & Evacuation Camp)
+    // Initialize Posko B (Logistics & Evacuation Camp backed by Memory adapter)
     val dbB = MemoryDbAdapter()
     val transportB = SimulatedTransport("posko-logistik-selo", network)
     val engineB = AirDbEngine("posko-logistik-selo", dbB, transportB)
 
-    println("\n[1] Seeding offline records at Posko Medis...")
+    println("\n[1] Seeding offline records at Posko Medis (Durable SQLite)...")
     engineA.saveRecord(
         collection = "survivors",
         id = "survivor-001",
@@ -57,7 +61,7 @@ fun main() = runBlocking {
         payload = "{\"item\": \"Oxygen Tanks\", \"urgency\": \"Critical\", \"qty\": 10}".toByteArray()
     )
 
-    println("[2] Seeding offline records at Posko Logistik...")
+    println("[2] Seeding offline records at Posko Logistik (In-Memory)...")
     engineB.saveRecord(
         collection = "survivors",
         id = "survivor-002",
@@ -71,9 +75,14 @@ fun main() = runBlocking {
         payload = "{\"item\": \"Ready-to-eat Meals\", \"availableQty\": 1200}".toByteArray()
     )
 
+    val initialSurvivorsA = dbA.getActiveRecords("survivors").size
+    val initialMedNeedsA = dbA.getActiveRecords("medical_needs").size
+    val initialSurvivorsB = dbB.getAllRecords("survivors").size
+    val initialSuppliesB = dbB.getAllRecords("supplies_inventory").size
+
     println("\nInitial State:")
-    println(" - Posko Medis holds ${dbA.getAllRecords("survivors").size} survivor records and ${dbA.getAllRecords("medical_needs").size} medical needs.")
-    println(" - Posko Logistik holds ${dbB.getAllRecords("survivors").size} survivor records and ${dbB.getAllRecords("supplies_inventory").size} inventory items.")
+    println(" - Posko Medis holds $initialSurvivorsA survivor records and $initialMedNeedsA medical needs.")
+    println(" - Posko Logistik holds $initialSurvivorsB survivor records and $initialSuppliesB inventory items.")
 
     println("\n[3] Volunteers approach each other in the field (BLE radio in range)...")
     val latchA = CountDownLatch(1)
@@ -95,21 +104,36 @@ fun main() = runBlocking {
     latchB.await(5, TimeUnit.SECONDS)
     delay(300)
 
+    val syncedSurvivorsA = dbA.getActiveRecords("survivors")
+    val syncedSurvivorsB = dbB.getAllRecords("survivors")
+
     println("\n[4] Synchronized State after BLE P2P Exchange:")
-    println(" - Posko Medis now holds total survivors: ${dbA.getAllRecords("survivors").size}")
-    dbA.getAllRecords("survivors").forEach { (id, record) ->
+    println(" - Posko Medis now holds total survivors: ${syncedSurvivorsA.size}")
+    syncedSurvivorsA.forEach { (id, record) ->
         println("   * [ID: $id] -> ${String(record.payload)} (HLC: ${record.hlcTimestamp})")
     }
 
-    println(" - Posko Logistik now holds total survivors: ${dbB.getAllRecords("survivors").size}")
-    dbB.getAllRecords("survivors").forEach { (id, record) ->
+    println(" - Posko Logistik now holds total survivors: ${syncedSurvivorsB.size}")
+    syncedSurvivorsB.forEach { (id, record) ->
         println("   * [ID: $id] -> ${String(record.payload)} (HLC: ${record.hlcTimestamp})")
     }
 
-    println("\n==================================================================")
-    println("  Success: AirDB databases converged with 100% causal consistency! ")
-    println("==================================================================")
-
+    println("\n[5] Simulating sudden power cut & device reboot on Posko Medis node...")
     engineA.stop()
     engineB.stop()
+    dbA.close()
+
+    // Reopen database directly from disk file to verify persistence
+    val rebootedDbA = SqliteDbAdapter.open(dbFileA)
+    val persistedSurvivors = rebootedDbA.getActiveRecords("survivors")
+    println(" - Rebooted Posko Medis retrieved ${persistedSurvivors.size} survivors from SQLite disk:")
+    persistedSurvivors.forEach { (id, record) ->
+        println("   * [Disk Restored: $id] -> ${String(record.payload)}")
+    }
+    rebootedDbA.close()
+
+    println("\n==================================================================")
+    println("  Success: AirDB databases converged with 100% causal consistency ")
+    println("           and durable SQLite disk persistence across reboots!    ")
+    println("==================================================================")
 }

@@ -62,7 +62,11 @@ object HlcComparator : Comparator<String> {
         return hlcTimestamp.substring(secondDash + 1)
     }
 
-    private fun parseHlcComponents(str: String): Triple<Long, Int, String>? {
+    /**
+     * Decomposes a canonical HLC timestamp string into its physical time (ms),
+     * logical counter, and originating node ID components.
+     */
+    fun parseHlcComponents(str: String): Triple<Long, Int, String>? {
         val firstDash = str.indexOf('-')
         if (firstDash <= 0) return null
         val secondDash = str.indexOf('-', firstDash + 1)
