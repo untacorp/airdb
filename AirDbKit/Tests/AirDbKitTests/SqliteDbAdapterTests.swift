@@ -111,8 +111,10 @@ final class SqliteDbAdapterTests: XCTestCase {
         )
         try await adapter.applyChanges([insertRec])
 
-        XCTAssertFalse(try await adapter.isRecordDeleted(collection: "notes", id: "tomb-1"))
-        XCTAssertNotNil(try await adapter.getActiveRecord(collection: "notes", id: "tomb-1"))
+        let isDeletedBefore = try await adapter.isRecordDeleted(collection: "notes", id: "tomb-1")
+        XCTAssertFalse(isDeletedBefore)
+        let activeBefore = try await adapter.getActiveRecord(collection: "notes", id: "tomb-1")
+        XCTAssertNotNil(activeBefore)
 
         // Soft delete via tombstone
         let deleteRec = ChangeRecord(
@@ -124,8 +126,10 @@ final class SqliteDbAdapterTests: XCTestCase {
         )
         try await adapter.applyChanges([deleteRec])
 
-        XCTAssertTrue(try await adapter.isRecordDeleted(collection: "notes", id: "tomb-1"))
-        XCTAssertNil(try await adapter.getActiveRecord(collection: "notes", id: "tomb-1"))
+        let isDeletedAfter = try await adapter.isRecordDeleted(collection: "notes", id: "tomb-1")
+        XCTAssertTrue(isDeletedAfter)
+        let activeAfter = try await adapter.getActiveRecord(collection: "notes", id: "tomb-1")
+        XCTAssertNil(activeAfter)
 
         // Purge via compact
         try await adapter.compact(pruneHlcThreshold: "1002-0-nodeA")

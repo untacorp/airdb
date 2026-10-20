@@ -81,15 +81,15 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         }
 
         self.db = validDb
-        try initializeDatabase(isMemory: path == ":memory:" || path.contains("mode=memory"))
+        try Self.initializeDatabase(db: validDb, isMemory: path == ":memory:" || path.contains("mode=memory"))
     }
 
-    private func initializeDatabase(isMemory: Bool) throws {
+    private static func initializeDatabase(db: OpaquePointer, isMemory: Bool) throws {
         if !isMemory {
-            try executeSimple("PRAGMA journal_mode = WAL;")
+            try executeSimple(db: db, sql: "PRAGMA journal_mode = WAL;")
         }
-        try executeSimple("PRAGMA synchronous = NORMAL;")
-        try executeSimple("PRAGMA foreign_keys = ON;")
+        try executeSimple(db: db, sql: "PRAGMA synchronous = NORMAL;")
+        try executeSimple(db: db, sql: "PRAGMA foreign_keys = ON;")
 
         let createEntities = """
         CREATE TABLE IF NOT EXISTS airdb_entities (
@@ -102,13 +102,13 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
             PRIMARY KEY (collection, id)
         );
         """
-        try executeSimple(createEntities)
+        try executeSimple(db: db, sql: createEntities)
 
         let createEntitiesIdx = """
         CREATE INDEX IF NOT EXISTS idx_entities_hlc 
         ON airdb_entities (hlc_timestamp);
         """
-        try executeSimple(createEntitiesIdx)
+        try executeSimple(db: db, sql: createEntitiesIdx)
 
         let createChangelog = """
         CREATE TABLE IF NOT EXISTS airdb_changelog (
@@ -121,23 +121,27 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
             created_at INTEGER NOT NULL
         );
         """
-        try executeSimple(createChangelog)
+        try executeSimple(db: db, sql: createChangelog)
 
         let createChangelogIdxHlc = """
         CREATE INDEX IF NOT EXISTS idx_changelog_hlc 
         ON airdb_changelog (hlc_timestamp);
         """
-        try executeSimple(createChangelogIdxHlc)
+        try executeSimple(db: db, sql: createChangelogIdxHlc)
 
         let createChangelogIdxColId = """
         CREATE INDEX IF NOT EXISTS idx_changelog_collection_id 
         ON airdb_changelog (collection, id);
         """
-        try executeSimple(createChangelogIdxColId)
+        try executeSimple(db: db, sql: createChangelogIdxColId)
     }
 
     private func executeSimple(_ sql: String) throws {
         guard let db = db else { throw SqliteError.databaseClosed }
+        try Self.executeSimple(db: db, sql: sql)
+    }
+
+    private static func executeSimple(db: OpaquePointer, sql: String) throws {
         var errMsg: UnsafeMutablePointer<CChar>?
         if sqlite3_exec(db, sql, nil, nil, &errMsg) != SQLITE_OK {
             let msg = errMsg.flatMap { String(cString: $0) } ?? "Unknown SQLite error"
