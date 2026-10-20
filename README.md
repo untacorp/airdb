@@ -6,6 +6,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0%2B-purple.svg)](https://kotlinlang.org)
+[![Swift](https://img.shields.io/badge/Swift-5.9%2B-orange.svg)](AirDbKit/)
 [![Architecture](https://img.shields.io/badge/Architecture-Sans--I%2FO-success.svg)](docs/ARCHITECTURE.md)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](#testing)
 
@@ -151,6 +152,7 @@ engine.saveRecord(
 | [`airdb-transport-sim`](airdb-transport-sim/) | In-memory packet radio mesh simulator for fast automated tests. | Pure Kotlin |
 | [`airdb-transport-ble`](airdb-transport-ble/) | Production Android BLE GATT server/client and anti-race queue. | Android SDK / Kotlin |
 | [`airdb-samples`](airdb-samples/) | Runnable CLI simulation demos demonstrating multi-node sync. | Kotlin |
+| [`AirDbKit`](AirDbKit/) | Native Swift package for iOS, macOS, watchOS with CoreBluetooth support. | Swift 5.9+ / Apple SDK |
 
 ---
 
