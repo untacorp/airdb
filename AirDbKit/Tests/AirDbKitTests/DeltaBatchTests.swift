@@ -40,21 +40,21 @@ final class DeltaBatchTests: XCTestCase {
             )
         ]
 
-        let serialized = DeltaBatch.serialize(changes: records)
+        let serialized = DeltaBatch.serialize(records)
         XCTAssertFalse(serialized.isEmpty)
 
-        let deserialized = DeltaBatch.deserialize(data: serialized)
+        let deserialized = DeltaBatch.deserialize(serialized)
         XCTAssertEqual(deserialized.count, 2)
 
         XCTAssertEqual(deserialized[0].id, "rec-1")
         XCTAssertEqual(deserialized[0].collection, "survivors")
-        XCTAssertEqual(deserialized[0].type, .insert)
+        XCTAssertEqual(deserialized[0].type, MutationType.insert)
         XCTAssertEqual(deserialized[0].payload, payload1)
         XCTAssertEqual(deserialized[0].hlcTimestamp, "1700000000000-0-nodeA")
 
         XCTAssertEqual(deserialized[1].id, "rec-2")
         XCTAssertEqual(deserialized[1].collection, "survivors")
-        XCTAssertEqual(deserialized[1].type, .update)
+        XCTAssertEqual(deserialized[1].type, MutationType.update)
         XCTAssertEqual(deserialized[1].payload, payload2)
         XCTAssertEqual(deserialized[1].hlcTimestamp, "1700000000001-0-nodeB")
     }
@@ -71,11 +71,11 @@ final class DeltaBatchTests: XCTestCase {
             )
         ]
 
-        let serialized = DeltaBatch.serialize(changes: records)
+        let serialized = DeltaBatch.serialize(records)
         // Truncate serialized bytes progressively and assert deserializer returns gracefully without throwing
         for i in 0..<serialized.count {
             let truncated = serialized.subdata(in: 0..<i)
-            let result = DeltaBatch.deserialize(data: truncated)
+            let result = DeltaBatch.deserialize(truncated)
             XCTAssertTrue(result.count <= 1)
         }
     }
