@@ -42,3 +42,14 @@ Welcome to **AirDB**. This file outlines mandatory architectural constraints, co
 3. **Immutability by Default**: Use `data class` with `val` properties. Favor persistent or copy-on-write state representations.
 4. **License Header**: All new source files must begin with the standard Apache-2.0 copyright header.
 5. **No Deadlocks**: Never perform blocking I/O or `runBlocking` inside transport delegate callbacks or event loops. Use Kotlin Coroutines and non-blocking channels.
+6. **Zero-Emoji Policy**: Strictly zero emojis across all code, tests, commit messages, and documentation.
+7. **Commit Standards**: Strictly follow Conventional Commits v1.0.0 as documented in `CONTRIBUTING.md`.
+
+---
+
+## 3. Engineering Roadmap & Track Status
+
+- **Track 0 (Native Apple Interoperability)**: COMPLETE. `AirDbKit` Swift package implemented, tested, and pushed. Formal math specifications verified in GitHub MathJax.
+- **Track 1 (Production Android BLE Driver & CI/CD)**: COMPLETE. `AndroidBleTransport` implemented with `GattOperationQueue`, dynamic `android.jar` resolution, permissions helper, and GitHub Actions CI.
+- **Track 2 (Durable Persistence Engine)**: NEXT TARGET. Implement persistent storage adapters transitioning from in-memory to disk-backed storage (SQLite/Room/SQLDelight for Android/JVM, SQLite/GRDB for Apple) with atomic transactions, tombstone management, and pruning.
+- **Track 3 (Physical Verification & Formal Publication)**: FUTURE. Hardware radio benchmarking and academic whitepaper.
