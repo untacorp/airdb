@@ -210,7 +210,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         sqlite3_bind_text(stmt, 2, entity.id, -1, sqliteTransient)
         sqlite3_bind_int(stmt, 3, Int32(entity.type.rawValue))
         if entity.payload.isEmpty {
-            sqlite3_bind_blob(stmt, 4, nil, 0, sqliteTransient)
+            sqlite3_bind_zeroblob(stmt, 4, 0)
         } else {
             entity.payload.withUnsafeBytes { rawBuffer in
                 sqlite3_bind_blob(stmt, 4, rawBuffer.baseAddress, Int32(entity.payload.count), sqliteTransient)
@@ -291,7 +291,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         sqlite3_bind_text(stmt, 2, record.id, -1, sqliteTransient)
         sqlite3_bind_int(stmt, 3, Int32(record.type.rawValue))
         if record.payload.isEmpty {
-            sqlite3_bind_blob(stmt, 4, nil, 0, sqliteTransient)
+            sqlite3_bind_zeroblob(stmt, 4, 0)
         } else {
             record.payload.withUnsafeBytes { rawBuffer in
                 sqlite3_bind_blob(stmt, 4, rawBuffer.baseAddress, Int32(record.payload.count), sqliteTransient)
@@ -405,7 +405,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                 sqlite3_bind_text(upsertStmt, 2, change.id, -1, sqliteTransient)
                 sqlite3_bind_int(upsertStmt, 3, typeInt)
                 if change.payload.isEmpty {
-                    sqlite3_bind_blob(upsertStmt, 4, nil, 0, sqliteTransient)
+                    sqlite3_bind_zeroblob(upsertStmt, 4, 0)
                 } else {
                     change.payload.withUnsafeBytes { rawBuffer in
                         sqlite3_bind_blob(upsertStmt, 4, rawBuffer.baseAddress, Int32(change.payload.count), sqliteTransient)
@@ -425,7 +425,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                 sqlite3_bind_text(changelogStmt, 2, change.id, -1, sqliteTransient)
                 sqlite3_bind_int(changelogStmt, 3, typeInt)
                 if change.payload.isEmpty {
-                    sqlite3_bind_blob(changelogStmt, 4, nil, 0, sqliteTransient)
+                    sqlite3_bind_zeroblob(changelogStmt, 4, 0)
                 } else {
                     change.payload.withUnsafeBytes { rawBuffer in
                         sqlite3_bind_blob(changelogStmt, 4, rawBuffer.baseAddress, Int32(change.payload.count), sqliteTransient)
