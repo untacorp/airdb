@@ -46,6 +46,8 @@ jobs:
   jvm-tests:
     name: JVM & Android BLE Driver Tests
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -56,14 +58,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android Platform 34
-        run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-34"
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew

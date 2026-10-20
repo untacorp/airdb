@@ -102,11 +102,11 @@ public enum DeltaBatch {
 
             changes.append(
                 ChangeRecord(
-                    id = id,
-                    collection = coll,
-                    type = type,
-                    payload = payload,
-                    hlcTimestamp = hlc
+                    id: id,
+                    collection: coll,
+                    type: type,
+                    payload: payload,
+                    hlcTimestamp: hlc
                 )
             )
         }
