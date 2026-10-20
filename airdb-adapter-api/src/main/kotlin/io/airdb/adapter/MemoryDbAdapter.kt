@@ -35,8 +35,16 @@ class MemoryDbAdapter : AirDbAdapter {
             return changelog.take(limit)
         }
         return changelog
-            .filter { it.hlcTimestamp > sinceHlcTimestamp }
+            .filter { HlcComparator.compare(it.hlcTimestamp, sinceHlcTimestamp) > 0 }
             .take(limit)
+    }
+
+    override suspend fun getMissingChanges(peerClock: Map<String, String>, limit: Int): List<ChangeRecord> {
+        return changelog.filter { record ->
+            val origin = HlcComparator.extractNodeId(record.hlcTimestamp) ?: ""
+            val peerKnown = peerClock[origin]
+            peerKnown == null || HlcComparator.compare(record.hlcTimestamp, peerKnown) > 0
+        }.take(limit)
     }
 
     override suspend fun applyChanges(changes: List<ChangeRecord>) {
@@ -44,8 +52,8 @@ class MemoryDbAdapter : AirDbAdapter {
             val table = tables.getOrPut(change.collection) { ConcurrentHashMap() }
             val existing = table[change.id]
 
-            // Last-Write-Wins (LWW) check based on HLC string comparison
-            if (existing == null || change.hlcTimestamp > existing.hlcTimestamp) {
+            // Last-Write-Wins (LWW) check based on canonical HLC total ordering
+            if (existing == null || HlcComparator.compare(change.hlcTimestamp, existing.hlcTimestamp) > 0) {
                 table[change.id] = change
                 changelog.add(change)
             }
@@ -53,7 +61,7 @@ class MemoryDbAdapter : AirDbAdapter {
     }
 
     override suspend fun getLatestHlc(): String? {
-        return changelog.maxByOrNull { it.hlcTimestamp }?.hlcTimestamp
+        return changelog.maxWithOrNull(Comparator.comparing({ it.hlcTimestamp }, HlcComparator))?.hlcTimestamp
     }
 
     /**

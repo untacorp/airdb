@@ -12,7 +12,7 @@ All multi-byte numeric values (Short, Int, Long) are encoded in **Network Byte O
 ## 2. Packet Framing (`AirDbPacket`)
 
 ```text
-Fixed Header (15 bytes without recipient, 23 bytes with recipient):
+Fixed Header (23 bytes without recipient, 31 bytes with recipient):
 +------------+---------+------+-------+-----------+----------------+-----------+--------------------+
 | Magic (2B) | Ver(1B) | Type | Flags | Timestamp | Payload Length | Sender ID | Recipient ID (opt) |
 | 0x41 0x44  | 0x01    | 1B   | 1B    | 8B (Long) | 2B (UInt16)    | 8B (Long) | 8B (Long)          |

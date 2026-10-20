@@ -17,7 +17,10 @@
 package io.airdb.core.engine
 
 import io.airdb.adapter.AirDbAdapter
+import io.airdb.adapter.ChangeRecord
+import io.airdb.adapter.HlcComparator
 import io.airdb.core.clock.HybridLogicalClock
+import io.airdb.core.clock.HlcTimestamp
 import io.airdb.core.clock.VectorClock
 import io.airdb.core.model.DeltaBatch
 import io.airdb.protocol.packet.AirDbPacket
@@ -37,6 +40,7 @@ class SyncSession(
     private val localNodeName: String,
     private val adapter: AirDbAdapter,
     private val clock: HybridLogicalClock,
+    private val vectorClock: VectorClock,
     private val transport: AirDbTransport,
     private val scope: CoroutineScope,
     private val onSyncCompleted: (peerId: String, changesApplied: Int) -> Unit
@@ -53,12 +57,23 @@ class SyncSession(
     private var currentState = State.IDLE
     private val peerVectorClock = VectorClock()
     private val isSyncing = AtomicBoolean(false)
-    @Volatile private var lastSentBatchMaxHlc: String? = null
+    @Volatile private var lastSentBatch: List<ChangeRecord>? = null
 
     fun start() {
         if (!isSyncing.compareAndSet(false, true)) return
         currentState = State.HANDSHAKING
         sendHandshake()
+    }
+
+    /**
+     * Triggered when a new local mutation is committed while peers are connected.
+     */
+    fun notifyLocalMutation() {
+        scope.launch {
+            if (currentState == State.SYNCHRONIZED || currentState == State.IDLE) {
+                streamDeltasToPeer()
+            }
+        }
     }
 
     private fun sendHandshake() {
@@ -75,7 +90,6 @@ class SyncSession(
     fun handlePacket(packet: AirDbPacket) {
         when (packet.type) {
             PacketType.HANDSHAKE -> {
-                // Respond with Handshake ACK
                 scope.launch {
                     val ack = AirDbPacket(
                         type = PacketType.HANDSHAKE_ACK,
@@ -96,17 +110,12 @@ class SyncSession(
                 peerVectorClock.merge(remoteClock)
 
                 scope.launch {
-                    // Send response with our latest known state
-                    val latestLocalHlc = adapter.getLatestHlc() ?: clock.current().toString()
-                    val myClock = VectorClock(mapOf(localNodeName to latestLocalHlc))
                     val resp = AirDbPacket(
                         type = PacketType.RECONCILE_RESP,
                         senderId = localNodeId,
-                        payload = myClock.toBinary()
+                        payload = vectorClock.toBinary()
                     )
                     transport.send(resp, targetPeerId = peerId)
-
-                    // Also immediately push deltas that peer needs
                     streamDeltasToPeer()
                 }
             }
@@ -124,8 +133,21 @@ class SyncSession(
                     val changes = DeltaBatch.deserialize(packet.payload)
                     if (changes.isNotEmpty()) {
                         // Advance local clock based on highest incoming change HLC
-                        val maxHlc = changes.maxOf { it.hlcTimestamp }
-                        clock.update(io.airdb.core.clock.HlcTimestamp.parse(maxHlc))
+                        val maxHlcRecord = changes.maxWithOrNull(Comparator.comparing({ it.hlcTimestamp }, HlcComparator))
+                        if (maxHlcRecord != null) {
+                            val parsed = HlcTimestamp.parseOrNull(maxHlcRecord.hlcTimestamp)
+                            if (parsed != null) {
+                                clock.update(parsed)
+                            }
+                        }
+
+                        // Update local vector clock for each incoming change
+                        for (change in changes) {
+                            val origin = HlcComparator.extractNodeId(change.hlcTimestamp) ?: ""
+                            if (origin.isNotEmpty()) {
+                                vectorClock.update(origin, change.hlcTimestamp)
+                            }
+                        }
 
                         // Apply to database
                         adapter.applyChanges(changes)
@@ -143,10 +165,13 @@ class SyncSession(
             }
 
             PacketType.DELTA_ACK -> {
-                val acknowledgedHlc = lastSentBatchMaxHlc
-                if (acknowledgedHlc != null) {
-                    peerVectorClock.update(localNodeName, acknowledgedHlc)
-                    lastSentBatchMaxHlc = null
+                val sent = lastSentBatch
+                if (sent != null && sent.isNotEmpty()) {
+                    for (change in sent) {
+                        val origin = HlcComparator.extractNodeId(change.hlcTimestamp) ?: localNodeName
+                        peerVectorClock.update(origin, change.hlcTimestamp)
+                    }
+                    lastSentBatch = null
                     scope.launch {
                         streamDeltasToPeer()
                     }
@@ -162,12 +187,10 @@ class SyncSession(
     private fun startReconciliation() {
         currentState = State.RECONCILING
         scope.launch {
-            val latestHlc = adapter.getLatestHlc() ?: clock.current().toString()
-            val localSummary = VectorClock(mapOf(localNodeName to latestHlc))
             val req = AirDbPacket(
                 type = PacketType.RECONCILE_REQ,
                 senderId = localNodeId,
-                payload = localSummary.toBinary()
+                payload = vectorClock.toBinary()
             )
             transport.send(req, targetPeerId = peerId)
         }
@@ -175,11 +198,10 @@ class SyncSession(
 
     private suspend fun streamDeltasToPeer() {
         currentState = State.STREAMING
-        val peerKnownHlc = peerVectorClock.get(localNodeName)
-        val missingChanges = adapter.getChangesSince(peerKnownHlc, limit = 500)
+        val missingChanges = adapter.getMissingChanges(peerVectorClock.asMap(), limit = 500)
 
         if (missingChanges.isNotEmpty()) {
-            lastSentBatchMaxHlc = missingChanges.last().hlcTimestamp
+            lastSentBatch = missingChanges
             val deltaBytes = DeltaBatch.serialize(missingChanges)
             val packet = AirDbPacket(
                 type = PacketType.DELTA_BATCH,

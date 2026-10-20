@@ -35,7 +35,7 @@ public final class VectorClock: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         if let current = clocks[nodeId] {
-            if hlcTimestamp > current {
+            if HlcComparator.compare(hlcTimestamp, current) == .orderedDescending {
                 clocks[nodeId] = hlcTimestamp
             }
         } else {
@@ -49,7 +49,7 @@ public final class VectorClock: @unchecked Sendable {
         defer { lock.unlock() }
         for (nodeId, ts) in otherMap {
             if let current = clocks[nodeId] {
-                if ts > current {
+                if HlcComparator.compare(ts, current) == .orderedDescending {
                     clocks[nodeId] = ts
                 }
             } else {

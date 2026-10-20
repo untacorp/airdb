@@ -96,7 +96,7 @@ public enum DeltaBatch {
             let payloadLen = Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: Int32.self).bigEndian })
             offset += 4
 
-            guard offset + payloadLen <= data.count else { break }
+            guard payloadLen >= 0, offset + payloadLen <= data.count else { break }
             let payload = data.subdata(in: offset..<(offset + payloadLen))
             offset += payloadLen
 

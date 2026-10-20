@@ -21,6 +21,7 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
     public let nodeName: String
     public let localNodeId: Int64
     public let clock: HybridLogicalClock
+    public let vectorClock = VectorClock()
     public let adapter: AirDbAdapter
     public let transport: AirDbTransport
 
@@ -95,6 +96,7 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
         payload: Data
     ) async throws -> ChangeRecord {
         let hlc = clock.now().description
+        vectorClock.update(nodeId: nodeName, hlcTimestamp: hlc)
         let record = ChangeRecord(
             id: id,
             collection: collection,
@@ -103,6 +105,18 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
             hlcTimestamp: hlc
         )
         try await adapter.applyChanges([record])
+
+        // Immediately trigger real-time delta streaming on active sessions
+        lock.lock()
+        let activeSessions = Array(sessions.values)
+        lock.unlock()
+
+        for session in activeSessions {
+            Task {
+                await session.notifyLocalMutation()
+            }
+        }
+
         return record
     }
 
@@ -125,6 +139,7 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
                 localNodeName: nodeName,
                 adapter: adapter,
                 clock: clock,
+                vectorClock: vectorClock,
                 transport: transport
             ) { [weak self] pId, changeCount in
                 guard let self = self else { return }
@@ -149,9 +164,31 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
             sessions.removeValue(forKey: peerId)
             lock.unlock()
 
-        case .packetReceived(let packet, let peerId, _):
+        case .packetReceived(let packet, let peerId, let linkId):
             lock.lock()
-            let session = sessions[peerId]
+            var session = sessions[peerId]
+            if session == nil {
+                let s = SyncSession(
+                    peerId: peerId,
+                    linkId: linkId,
+                    localNodeId: localNodeId,
+                    localNodeName: nodeName,
+                    adapter: adapter,
+                    clock: clock,
+                    vectorClock: vectorClock,
+                    transport: transport
+                ) { [weak self] pId, changeCount in
+                    guard let self = self else { return }
+                    self.lock.lock()
+                    let listeners = self.syncListeners
+                    self.lock.unlock()
+                    for listener in listeners {
+                        listener(pId, changeCount)
+                    }
+                }
+                sessions[peerId] = s
+                session = s
+            }
             lock.unlock()
 
             if let session = session {
@@ -159,6 +196,12 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
                     await session.handlePacket(packet)
                 }
             }
+
+        default:
+            break
+        }
+    }
+}
 
         default:
             break

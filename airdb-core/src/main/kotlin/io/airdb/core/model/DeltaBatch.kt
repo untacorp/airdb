@@ -68,24 +68,32 @@ object DeltaBatch {
         for (i in 0 until count) {
             if (buffer.remaining() < 2) break
             val idLen = buffer.getShort().toInt() and 0xFFFF
+            if (buffer.remaining() < idLen) break
             val idBytes = ByteArray(idLen)
             buffer.get(idBytes)
             val id = String(idBytes, Charsets.UTF_8)
 
+            if (buffer.remaining() < 2) break
             val collLen = buffer.getShort().toInt() and 0xFFFF
+            if (buffer.remaining() < collLen) break
             val collBytes = ByteArray(collLen)
             buffer.get(collBytes)
             val collection = String(collBytes, Charsets.UTF_8)
 
-            val typeOrdinal = buffer.get().toInt()
+            if (buffer.remaining() < 1) break
+            val typeOrdinal = buffer.get().toInt() and 0xFF
             val type = MutationType.entries.getOrElse(typeOrdinal) { MutationType.UPDATE }
 
+            if (buffer.remaining() < 2) break
             val hlcLen = buffer.getShort().toInt() and 0xFFFF
+            if (buffer.remaining() < hlcLen) break
             val hlcBytes = ByteArray(hlcLen)
             buffer.get(hlcBytes)
             val hlcTimestamp = String(hlcBytes, Charsets.UTF_8)
 
+            if (buffer.remaining() < 4) break
             val payloadLen = buffer.getInt()
+            if (payloadLen < 0 || buffer.remaining() < payloadLen) break
             val payload = ByteArray(payloadLen)
             buffer.get(payload)
 

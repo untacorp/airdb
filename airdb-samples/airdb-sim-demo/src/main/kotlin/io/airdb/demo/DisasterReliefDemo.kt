@@ -80,11 +80,11 @@ fun main() = runBlocking {
     val latchB = CountDownLatch(1)
 
     engineA.addSyncListener { peerId, changeCount ->
-        println(" ➔ [Posko Medis] Reconciled and applied $changeCount mutations from peer: $peerId")
+        println(" -> [Posko Medis] Reconciled and applied $changeCount mutations from peer: $peerId")
         latchA.countDown()
     }
     engineB.addSyncListener { peerId, changeCount ->
-        println(" ➔ [Posko Logistik] Reconciled and applied $changeCount mutations from peer: $peerId")
+        println(" -> [Posko Logistik] Reconciled and applied $changeCount mutations from peer: $peerId")
         latchB.countDown()
     }
 

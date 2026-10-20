@@ -34,13 +34,14 @@ public actor SyncSession {
     private let localNodeName: String
     private let adapter: AirDbAdapter
     private let clock: HybridLogicalClock
+    private let vectorClock: VectorClock
     private let transport: AirDbTransport
     private let onSyncCompleted: @Sendable (String, Int) -> Void
 
     private var currentState: State = .idle
     private let peerVectorClock = VectorClock()
     private var isSyncing: Bool = false
-    private var lastSentBatchMaxHlc: String?
+    private var lastSentBatch: [ChangeRecord]?
 
     public init(
         peerId: String,
@@ -49,6 +50,7 @@ public actor SyncSession {
         localNodeName: String,
         adapter: AirDbAdapter,
         clock: HybridLogicalClock,
+        vectorClock: VectorClock,
         transport: AirDbTransport,
         onSyncCompleted: @escaping @Sendable (String, Int) -> Void
     ) {
@@ -58,6 +60,7 @@ public actor SyncSession {
         self.localNodeName = localNodeName
         self.adapter = adapter
         self.clock = clock
+        self.vectorClock = vectorClock
         self.transport = transport
         self.onSyncCompleted = onSyncCompleted
     }
@@ -71,6 +74,13 @@ public actor SyncSession {
         isSyncing = true
         currentState = .handshaking
         await sendHandshake()
+    }
+
+    /// Triggered when a new local mutation is committed while peers are connected.
+    public func notifyLocalMutation() async {
+        if currentState == .synchronized || currentState == .idle {
+            await streamDeltasToPeer()
+        }
     }
 
     private func sendHandshake() async {
@@ -103,12 +113,10 @@ public actor SyncSession {
             let remoteClock = VectorClock.fromBinary(packet.payload)
             peerVectorClock.merge(remoteClock)
 
-            let latestLocalHlc = (try? await adapter.getLatestHlc()) ?? clock.current().description
-            let myClock = VectorClock(initialState: [localNodeName: latestLocalHlc])
             let resp = AirDbPacket(
                 type: .reconcileResp,
                 senderId: localNodeId,
-                payload: myClock.toBinary()
+                payload: vectorClock.toBinary()
             )
             _ = await transport.send(packet: resp, targetPeerId: peerId)
             await streamDeltasToPeer()
@@ -121,9 +129,17 @@ public actor SyncSession {
         case .deltaBatch:
             let changes = DeltaBatch.deserialize(packet.payload)
             if !changes.isEmpty {
-                if let maxHlc = changes.map(\.hlcTimestamp).max(),
-                   let parsed = HlcTimestamp.parse(maxHlc) {
+                // Advance local clock based on highest incoming change HLC
+                let maxHlcRecord = changes.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })
+                if let maxHlc = maxHlcRecord?.hlcTimestamp, let parsed = HlcTimestamp.parse(maxHlc) {
                     _ = clock.update(remote: parsed)
+                }
+
+                // Update local vector clock for each incoming change
+                for change in changes {
+                    if let origin = HlcComparator.extractNodeId(from: change.hlcTimestamp) {
+                        vectorClock.update(nodeId: origin, hlcTimestamp: change.hlcTimestamp)
+                    }
                 }
 
                 do {
@@ -142,9 +158,12 @@ public actor SyncSession {
             _ = await transport.send(packet: ack, targetPeerId: peerId)
 
         case .deltaAck:
-            if let acknowledgedHlc = lastSentBatchMaxHlc {
-                peerVectorClock.update(nodeId: localNodeName, hlcTimestamp: acknowledgedHlc)
-                lastSentBatchMaxHlc = nil
+            if let sent = lastSentBatch, !sent.isEmpty {
+                for change in sent {
+                    let origin = HlcComparator.extractNodeId(from: change.hlcTimestamp) ?? localNodeName
+                    peerVectorClock.update(nodeId: origin, hlcTimestamp: change.hlcTimestamp)
+                }
+                lastSentBatch = nil
                 await streamDeltasToPeer()
             } else {
                 currentState = .synchronized
@@ -157,23 +176,20 @@ public actor SyncSession {
 
     private func startReconciliation() async {
         currentState = .reconciling
-        let latestHlc = (try? await adapter.getLatestHlc()) ?? clock.current().description
-        let localSummary = VectorClock(initialState: [localNodeName: latestHlc])
         let req = AirDbPacket(
             type: .reconcileReq,
             senderId: localNodeId,
-            payload: localSummary.toBinary()
+            payload: vectorClock.toBinary()
         )
         _ = await transport.send(packet: req, targetPeerId: peerId)
     }
 
     private func streamDeltasToPeer() async {
         currentState = .streaming
-        let peerKnownHlc = peerVectorClock.get(localNodeName)
-        let missingChanges = (try? await adapter.getChangesSince(sinceHlcTimestamp: peerKnownHlc, limit: 500)) ?? []
+        let missingChanges = (try? await adapter.getMissingChanges(peerClock: peerVectorClock.asMap(), limit: 500)) ?? []
 
         if !missingChanges.isEmpty {
-            lastSentBatchMaxHlc = missingChanges.last?.hlcTimestamp
+            lastSentBatch = missingChanges
             let deltaBytes = DeltaBatch.serialize(missingChanges)
             let packet = AirDbPacket(
                 type: .deltaBatch,

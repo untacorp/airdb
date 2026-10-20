@@ -9,7 +9,10 @@ Welcome to **AirDB**. This file outlines mandatory architectural constraints, co
 ### Invariant 1: Sans-I/O Discipline
 * `airdb-core`, `airdb-protocol`, and `airdb-adapter-api` must remain **100% pure Kotlin** with zero dependencies on Android SDK (`android.*`) or platform socket APIs.
 * Business logic, state machines, clocks, and binary protocols must be implemented as pure functions:
-  $$\text{handle}(Event, State) \to (State', [Effects])$$
+
+```math
+\text{handle}(\text{Event}, \text{State}) \to (\text{State}', [\text{Effects}])
+```
 * All platform-specific I/O belongs exclusively to `airdb-transport-ble` (or future `airdb-transport-wifi`, etc.).
 
 ### Invariant 2: Deterministic Testability Without Hardware

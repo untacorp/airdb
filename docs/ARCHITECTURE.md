@@ -27,25 +27,130 @@ AirDB solves this with `GattOperationQueue`:
 
 ---
 
-## 3. Distributed Causality & Conflict Resolution
+## 3. Distributed Causality & Formal Mathematics
 
 ### Hybrid Logical Clocks (HLC)
+
 In off-grid disaster environments or mobile POS setups, physical system clocks can drift by minutes or hours due to lack of network time synchronization (NTP).
 
-AirDB uses **Hybrid Logical Clocks (HLC)** combining:
-* `physicalTime`: Milliseconds since epoch.
-* `logicalCounter`: An incrementing counter for events occurring within the same physical millisecond.
-* `nodeId`: A unique node string identifier acting as a deterministic tie-breaker.
+AirDB uses **Hybrid Logical Clocks (HLC)** combining physical time, an incrementing counter, and a node tie-breaker:
 
-### Monotonic Causality Rules:
-1. **Local Writes**: When generating a new timestamp on node $j$:
-   $$pt' = \max(latest.pt, \text{now}())$$
-   $$lc' = \begin{cases} latest.lc + 1 & \text{if } pt' = latest.pt \\ 0 & \text{otherwise} \end{cases}$$
-2. **Remote Ingest**: When node $j$ observes remote timestamp $T_{remote}$:
-   $$pt' = \max(\max(latest.pt, T_{remote}.pt), \text{now}())$$
-   $$lc' = \begin{cases} \max(latest.lc, T_{remote}.lc) + 1 & \text{if } pt' = latest.pt = T_{remote}.pt \\ latest.lc + 1 & \text{if } pt' = latest.pt \\ T_{remote}.lc + 1 & \text{if } pt' = T_{remote}.pt \\ 0 & \text{otherwise} \end{cases}$$
+```math
+T = (pt, lc, nodeId)
+```
 
-### Last-Write-Wins (LWW) Merge
-When merging mutations for the same record ID:
-$$\text{Winner} = \max_{HLC}(Record_{local}, Record_{remote})$$
-Because HLC timestamps are strictly monotonic and globally unique across all nodes, every node independently arrives at identical data states.
+Where:
+* $pt \in \mathbb{N}_0$: Physical time (epoch milliseconds).
+* $lc \in \mathbb{N}_0$: Monotonic logical counter for events sharing the same physical millisecond.
+* $nodeId \in \Sigma^+$: Globally unique node identifier ensuring total ordering.
+
+### Total Order Relation ($<_{HLC}$)
+
+For any two timestamps $T_1 = (pt_1, lc_1, node_1)$ and $T_2 = (pt_2, lc_2, node_2)$, the strict total order $<_{HLC}$ is defined lexicographically:
+
+```math
+T_1 <_{HLC} T_2 \iff \begin{cases}
+pt_1 < pt_2 \\
+pt_1 = pt_2 \land lc_1 < lc_2 \\
+pt_1 = pt_2 \land lc_1 = lc_2 \land node_1 <_{lex} node_2
+\end{cases}
+```
+
+This relation forms a strict total order: irreflexive, asymmetric, transitive, and connex. Every pair of timestamps is deterministically comparable across all distributed replicas.
+
+### Monotonic Causality Progression Rules
+
+#### Rule 1: Local Mutation
+When generating a new timestamp on node $j$:
+
+```math
+pt' = \max(latest.pt, \text{now}())
+```
+
+```math
+lc' = \begin{cases}
+latest.lc + 1 & \text{if } pt' = latest.pt \\
+0 & \text{otherwise}
+\end{cases}
+```
+
+#### Rule 2: Remote Message Ingestion
+When node $j$ observes remote timestamp $T_{remote} = (pt_{rem}, lc_{rem}, node_{rem})$:
+
+```math
+pt' = \max(\max(latest.pt, pt_{rem}), \text{now}())
+```
+
+```math
+lc' = \begin{cases}
+\max(latest.lc, lc_{rem}) + 1 & \text{if } pt' = latest.pt = pt_{rem} \\
+latest.lc + 1 & \text{if } pt' = latest.pt \\
+lc_{rem} + 1 & \text{if } pt' = pt_{rem} \\
+0 & \text{otherwise}
+\end{cases}
+```
+
+---
+
+## 4. Vector Clock State Tracking & Delta Reconciliation
+
+### Formal Definition of Vector Clock
+
+A Vector Clock $V$ on a node is a partial function mapping originating node identifiers to their highest known causal HLC timestamp:
+
+```math
+V : \text{NodeId} \to \text{HLC}
+```
+
+### Causal Dominance & Partial Order
+
+Given two vector clocks $V_A$ and $V_B$:
+
+```math
+V_A \le V_B \iff \forall k \in \text{dom}(V_A): V_A[k] \le_{HLC} V_B[k]
+```
+
+```math
+V_A < V_B \iff (V_A \le V_B) \land (V_A \ne V_B)
+```
+
+If neither $V_A \le V_B$ nor $V_B \le V_A$, the states are causally concurrent:
+
+```math
+V_A \parallel V_B \iff \neg(V_A \le V_B) \land \neg(V_B \le V_A)
+```
+
+### Exact Delta Reconciliation Set
+
+When node $B$ reconciles with node $A$ presenting knowledge vector $V_A$, the minimal missing delta batch $\Delta(B \to A)$ is computed as:
+
+```math
+\Delta(B \to A) = \left\{ r \in \text{Records}_B \mid r.hlc >_{HLC} V_A[r.nodeId] \right\}
+```
+
+Where $V_A[r.nodeId] = -\infty$ if $r.nodeId \notin \text{dom}(V_A)$.
+
+This invariant guarantees that:
+1. Re-connecting nodes transmit only novel mutations created during partition intervals.
+2. Bandwidth consumption over BLE is strictly bounded to missing records $\mathcal{O}(|\Delta|)$ rather than total database size $\mathcal{O}(|\text{DB}|)$.
+
+### Conflict Resolution: Last-Write-Wins (LWW)
+
+For any record key $K$ subject to concurrent mutations $M_A$ and $M_B$:
+
+```math
+\text{Winner}(K) = \begin{cases}
+M_A & \text{if } M_A.hlc >_{HLC} M_B.hlc \\
+M_B & \text{otherwise}
+\end{cases}
+```
+
+### Convergence Theorem
+
+Under epidemic pairwise gossip across any connected graph component $G = (V, E)$, the database state $S_i(t)$ of every node $i$ monotonically converges:
+
+```math
+\lim_{t \to \infty} S_i(t) = S_j(t) = \bigcup_{k \in \text{Keys}} \max_{<_{HLC}} \left( \text{Mutations}(k) \right)
+```
+
+All replicas independently reach 100% causal identity without central coordination or distributed consensus rounds.

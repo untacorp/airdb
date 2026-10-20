@@ -42,8 +42,8 @@ public final class AssemblyBuffer: @unchecked Sendable {
             return nil
         }
 
-        // Validate index boundary
-        guard header.index < header.total else { return nil }
+        // Validate index and total bounds
+        guard header.total > 0, header.index >= 0, header.index < header.total else { return nil }
 
         lock.lock()
         defer { lock.unlock() }

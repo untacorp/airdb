@@ -38,13 +38,20 @@ data class HlcTimestamp(
     companion object {
         val ZERO = HlcTimestamp(0L, 0, "")
 
+        fun parseOrNull(str: String): HlcTimestamp? {
+            val firstDash = str.indexOf('-')
+            if (firstDash <= 0) return null
+            val secondDash = str.indexOf('-', firstDash + 1)
+            if (secondDash <= firstDash + 1 || secondDash >= str.length - 1) return null
+
+            val pt = str.substring(0, firstDash).toLongOrNull() ?: return null
+            val lc = str.substring(firstDash + 1, secondDash).toIntOrNull() ?: return null
+            val node = str.substring(secondDash + 1)
+            return HlcTimestamp(pt, lc, node)
+        }
+
         fun parse(str: String): HlcTimestamp {
-            val parts = str.split("-")
-            require(parts.size >= 3) { "Invalid HLC timestamp format: $str" }
-            val physical = parts[0].toLong()
-            val logical = parts[1].toInt()
-            val node = parts.subList(2, parts.size).joinToString("-")
-            return HlcTimestamp(physical, logical, node)
+            return parseOrNull(str) ?: throw IllegalArgumentException("Invalid HLC timestamp format: $str")
         }
     }
 }

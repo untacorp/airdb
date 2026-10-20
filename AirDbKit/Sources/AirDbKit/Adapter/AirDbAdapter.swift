@@ -21,6 +21,9 @@ public protocol AirDbAdapter: Sendable {
     /// Retrieves local mutations strictly newer than `sinceHlcTimestamp`, up to `limit` records.
     func getChangesSince(sinceHlcTimestamp: String?, limit: Int) async throws -> [ChangeRecord]
 
+    /// Retrieves mutations missing on the remote peer according to its vector clock.
+    func getMissingChanges(peerClock: [String: String], limit: Int) async throws -> [ChangeRecord]
+
     /// Idempotently applies remote mutations into local storage using Last-Write-Wins (LWW).
     func applyChanges(_ changes: [ChangeRecord]) async throws
 
@@ -38,9 +41,17 @@ public actor MemoryDbAdapter: AirDbAdapter {
 
     public func getChangesSince(sinceHlcTimestamp: String?, limit: Int = 100) async throws -> [ChangeRecord] {
         if let since = sinceHlcTimestamp {
-            return changelog.filter { $0.hlcTimestamp > since }.prefix(limit).map { $0 }
+            return changelog.filter { HlcComparator.compare($0.hlcTimestamp, since) == .orderedDescending }.prefix(limit).map { $0 }
         }
         return Array(changelog.prefix(limit))
+    }
+
+    public func getMissingChanges(peerClock: [String: String], limit: Int = 500) async throws -> [ChangeRecord] {
+        return changelog.filter { record in
+            let origin = HlcComparator.extractNodeId(from: record.hlcTimestamp) ?? ""
+            guard let peerKnown = peerClock[origin] else { return true }
+            return HlcComparator.compare(record.hlcTimestamp, peerKnown) == .orderedDescending
+        }.prefix(limit).map { $0 }
     }
 
     public func applyChanges(_ changes: [ChangeRecord]) async throws {
@@ -48,7 +59,7 @@ public actor MemoryDbAdapter: AirDbAdapter {
             var table = tables[change.collection] ?? [:]
             let existing = table[change.id]
 
-            if existing == nil || change.hlcTimestamp > existing!.hlcTimestamp {
+            if existing == nil || HlcComparator.compare(change.hlcTimestamp, existing!.hlcTimestamp) == .orderedDescending {
                 table[change.id] = change
                 tables[change.collection] = table
                 changelog.append(change)
@@ -57,7 +68,7 @@ public actor MemoryDbAdapter: AirDbAdapter {
     }
 
     public func getLatestHlc() async throws -> String? {
-        changelog.max(by: { $0.hlcTimestamp < $1.hlcTimestamp })?.hlcTimestamp
+        changelog.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })?.hlcTimestamp
     }
 
     public func getRecord(collection: String, id: String) -> ChangeRecord? {

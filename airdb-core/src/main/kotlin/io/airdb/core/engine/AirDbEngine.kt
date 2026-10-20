@@ -47,6 +47,7 @@ class AirDbEngine(
 
     val localNodeId: Long = nodeName.hashCode().toLong()
     val clock = HybridLogicalClock(nodeName)
+    val vectorClock = io.airdb.core.clock.VectorClock()
 
     private val sessions = ConcurrentHashMap<String, SyncSession>()
     private val syncListeners = CopyOnWriteArrayList<(peerId: String, changeCount: Int) -> Unit>()
@@ -92,6 +93,7 @@ class AirDbEngine(
         payload: ByteArray
     ): ChangeRecord {
         val hlc = clock.now().toString()
+        vectorClock.update(nodeName, hlc)
         val record = ChangeRecord(
             id = id,
             collection = collection,
@@ -100,6 +102,9 @@ class AirDbEngine(
             hlcTimestamp = hlc
         )
         adapter.applyChanges(listOf(record))
+
+        // Immediately trigger real-time delta streaming on active sessions
+        sessions.values.forEach { it.notifyLocalMutation() }
         return record
     }
 
@@ -120,6 +125,7 @@ class AirDbEngine(
                     localNodeName = nodeName,
                     adapter = adapter,
                     clock = clock,
+                    vectorClock = vectorClock,
                     transport = transport,
                     scope = scope
                 ) { peerId, changesApplied ->
@@ -134,7 +140,23 @@ class AirDbEngine(
             }
 
             is TransportEvent.PacketReceived -> {
-                sessions[event.peerId]?.handlePacket(event.packet)
+                val session = sessions.computeIfAbsent(event.peerId) {
+                    val s = SyncSession(
+                        peerId = event.peerId,
+                        linkId = event.linkId,
+                        localNodeId = localNodeId,
+                        localNodeName = nodeName,
+                        adapter = adapter,
+                        clock = clock,
+                        vectorClock = vectorClock,
+                        transport = transport,
+                        scope = scope
+                    ) { peerId, changesApplied ->
+                        syncListeners.forEach { it(peerId, changesApplied) }
+                    }
+                    s
+                }
+                session.handlePacket(event.packet)
             }
 
             else -> Unit

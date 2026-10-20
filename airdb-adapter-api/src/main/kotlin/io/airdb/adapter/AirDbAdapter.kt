@@ -50,4 +50,19 @@ interface AirDbAdapter {
      * Returns the highest HLC timestamp currently stored in the local database, or null if empty.
      */
     suspend fun getLatestHlc(): String?
+
+    /**
+     * Retrieves mutations missing on the remote peer according to its vector clock.
+     *
+     * @param peerClock Map of originating node ID to latest known HLC on the remote peer.
+     * @param limit Maximum number of records to return.
+     * @return List of change records that the remote peer has not yet received.
+     */
+    suspend fun getMissingChanges(peerClock: Map<String, String>, limit: Int = 500): List<ChangeRecord> {
+        return getChangesSince(null, limit = limit * 2).filter { record ->
+            val origin = HlcComparator.extractNodeId(record.hlcTimestamp) ?: ""
+            val peerKnown = peerClock[origin]
+            peerKnown == null || HlcComparator.compare(record.hlcTimestamp, peerKnown) > 0
+        }.take(limit)
+    }
 }

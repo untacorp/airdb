@@ -16,6 +16,7 @@
 
 package io.airdb.core.clock
 
+import io.airdb.adapter.HlcComparator
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
@@ -34,7 +35,7 @@ class VectorClock(
 
     fun update(nodeId: String, hlcTimestamp: String) {
         clocks.compute(nodeId) { _, current ->
-            if (current == null || hlcTimestamp > current) hlcTimestamp else current
+            if (current == null || HlcComparator.compare(hlcTimestamp, current) > 0) hlcTimestamp else current
         }
     }
 
@@ -53,7 +54,7 @@ class VectorClock(
         val entries = clocks.entries.toList()
         var estimatedSize = 2 // count (Short)
         for ((k, v) in entries) {
-            estimatedSize += 2 + k.toByteArray().size + 2 + v.toByteArray().size
+            estimatedSize += 2 + k.toByteArray(Charsets.UTF_8).size + 2 + v.toByteArray(Charsets.UTF_8).size
         }
 
         val buffer = ByteBuffer.allocate(estimatedSize).order(ByteOrder.BIG_ENDIAN)

@@ -47,6 +47,9 @@ class AssemblyBuffer(
         val decoded = FragmentHeader.decode(fragmentPacket.payload) ?: return null
         val (header, chunk) = decoded
 
+        // Validate total and index bounds
+        if (header.total <= 0 || header.index < 0 || header.index >= header.total) return null
+
         cleanExpired()
 
         synchronized(assemblies) {
