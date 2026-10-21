@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   publish-maven-and-release:
@@ -39,6 +40,15 @@ jobs:
           GPG_PASSPHRASE: ""
         run: |
           ./gradlew publishAllPublicationsToStagingRepository --no-daemon
+
+      - name: Publish to GitHub Packages
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ""
+        run: |
+          ./gradlew publishAllPublicationsToGitHubPackagesRepository --no-daemon
 
       - name: Package Central Bundle
         run: |
