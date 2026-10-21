@@ -1884,15 +1884,15 @@
 <p>This guide outlines the pipeline for publishing AirDB artifacts to Maven Central and the Swift Package Index.</p>
 <hr />
 <h2 id="1-jvm-android-publishing-maven-central">1. JVM &amp; Android Publishing (Maven Central)</h2>
-<p>AirDB publishes 8 JVM modules to Sonatype Maven Central:
-- <code>:airdb-adapter-api</code>
-- <code>:airdb-adapter-sqlite</code>
-- <code>:airdb-core</code>
-- <code>:airdb-crypto</code>
-- <code>:airdb-protocol</code>
-- <code>:airdb-transport-api</code>
-- <code>:airdb-transport-ble</code>
-- <code>:airdb-transport-sim</code></p>
+<p>AirDB publishes 8 JVM modules to Sonatype Maven Central under namespace <code>io.github.untacorp</code>:
+- <code>io.github.untacorp:airdb-adapter-api</code>
+- <code>io.github.untacorp:airdb-adapter-sqlite</code>
+- <code>io.github.untacorp:airdb-core</code>
+- <code>io.github.untacorp:airdb-crypto</code>
+- <code>io.github.untacorp:airdb-protocol</code>
+- <code>io.github.untacorp:airdb-transport-api</code>
+- <code>io.github.untacorp:airdb-transport-ble</code>
+- <code>io.github.untacorp:airdb-transport-sim</code></p>
 <h3 id="local-verification-publishtomavenlocal">Local Verification (<code>publishToMavenLocal</code>)</h3>
 <p>To verify POM generation, sources JARs, and javadoc JARs locally without publishing to remote repositories:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">cd</span><span class="w"> </span>airdb
