@@ -1,6 +1,6 @@
 # AirDB Architecture Guide
 
-This document details the architectural principles, threading model, and design invariants that make AirDB robust in low-bandwidth, partition-heavy Bluetooth Low Energy (BLE) environments.
+This document details the architectural principles, threading model, causal mathematics, persistence seam, and zero-trust cryptographic mesh that make AirDB robust in low-bandwidth, partition-heavy Bluetooth Low Energy (BLE) environments.
 
 ---
 
@@ -10,8 +10,8 @@ A recurring failure mode in peer-to-peer mobile libraries is tightly coupling ne
 
 AirDB adopts a strict **Sans-I/O** architecture:
 * **Protocol & Core logic are pure state transformations**: They take an inbound event or byte array, compute transitions, and return outbound effects or state updates.
-* **Platform boundary**: Bluetooth managers, Android GATT callbacks, and hardware timers exist exclusively in `airdb-transport-ble`.
-* **Instant simulation**: Because the core engine communicates via `AirDbTransport` interfaces, `SimulatedTransport` allows testing complex multi-node network topologies (with simulated packet drops, reordering, and partitions) completely in memory.
+* **Platform boundary**: Bluetooth managers, Android GATT callbacks, and hardware timers exist exclusively in `airdb-transport-ble` and `CoreBluetoothTransport`.
+* **Instant simulation**: Because the core engine communicates via `AirDbTransport` interfaces, `SimulatedTransport` allows testing complex multi-node network topologies (with simulated packet drops, reordering, and partitions) completely in memory in milliseconds.
 
 ---
 
@@ -24,6 +24,12 @@ AirDB solves this with `GattOperationQueue`:
 * **State per link**: Every active physical link has an isolated FIFO operation queue with an `inFlight` boolean flag.
 * **Trigger on callback**: The next operation in queue is dispatched ONLY when the driver invokes `onCharacteristicWrite` (Central) or `onNotificationSent` (Server).
 * **Backpressure bounds**: Queues enforce a strict capacity limit (default 256 operations or 1 MiB) with exponential backoff on transient stack errors.
+
+### Swift Actor Model on Apple Platforms
+On Apple platforms, `AirDbKit` implements the core engine as a Swift `actor`:
+* **Data Race Freedom**: Compile-time enforcement of isolated mutable state across threads.
+* **Non-Blocking Delegates**: Asynchronous CoreBluetooth delegate callbacks forward frames into structured Swift tasks without blocking radio threads.
+* **Zero Third-Party Dependencies**: Relies 100% on Apple standard frameworks (`CryptoKit`, `Compression`, `CoreBluetooth`, and native `libsqlite3`).
 
 ---
 
@@ -154,3 +160,105 @@ Under epidemic pairwise gossip across any connected graph component $G = (V, E)$
 ```
 
 All replicas independently reach 100% causal identity without central coordination or distributed consensus rounds.
+
+---
+
+## 5. Durable SQLite Persistence Seam
+
+AirDB provides production-ready, durable storage engines across all platforms:
+* **Android / JVM**: `SqliteAirDbAdapter` in `:airdb-adapter-sqlite`.
+* **Apple Platforms**: `SqliteDbAdapter` in `AirDbKit` utilizing native `libsqlite3`.
+
+### Schema Architecture & Change Tracking
+
+The underlying storage maintains an append-only, indexed changelog table alongside domain tables:
+
+```sql
+CREATE TABLE IF NOT EXISTS _airdb_changes (
+    collection TEXT NOT NULL,
+    id TEXT NOT NULL,
+    mutation_type INTEGER NOT NULL,
+    payload BLOB,
+    hlc_timestamp TEXT NOT NULL,
+    author_public_key BLOB,
+    signature BLOB,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (collection, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_airdb_changes_hlc
+ON _airdb_changes(hlc_timestamp ASC);
+```
+
+### Durability & ACID Guarantees
+1. **Write-Ahead Logging (WAL)**: All adapters enable `PRAGMA journal_mode = WAL` and `PRAGMA synchronous = NORMAL`, permitting non-blocking concurrent readers during write transactions.
+2. **Atomic Batch Application**: Inbound delta batches are applied inside an immediate transaction (`BEGIN IMMEDIATE` ... `COMMIT`). If verification fails or disk write aborts, the transaction rolls back cleanly.
+3. **Anti-Resurrection Tombstone Lifecycle**: Soft-deleted entities retain an entry with `mutation_type = 2` (DELETE) and the tombstone HLC timestamp. Any inbound mutation with an older timestamp is discarded, preventing obsolete sync passes from resurrecting deleted records.
+
+---
+
+## 6. Zero-Trust Cryptographic Mesh & Provenance
+
+In off-grid, multi-hop mesh deployments (such as disaster survivor coordination or remote mobile POS networks), packets pass through intermediate relay devices that may be untrusted, misconfigured, or adversarial. AirDB implements a two-tier **Zero-Trust Cryptographic Mesh**.
+
+```
++---------------------------------------------------------------------------------+
+| Layer 1: Cluster-Level Symmetric AEAD (RFC 8439 ChaCha20-Poly1305)             |
+| Encrypts over-the-air payload, binds packet header as AAD, authenticates link  |
++---------------------------------------------------------------------------------+
+| Layer 2: Record-Level Asymmetric Signatures (RFC 8032 Ed25519)                 |
+| Cryptographically binds each mutation to author public key, prevents forgery   |
++---------------------------------------------------------------------------------+
+| Layer 3: Key Derivation & Session Materials (RFC 5869 HKDF-SHA256)             |
+| Deterministically derives cluster and session keys from shared pre-shared keys |
++---------------------------------------------------------------------------------+
+```
+
+### Layer 1: Cluster-Level Symmetric AEAD (ChaCha20-Poly1305)
+
+To prevent eavesdropping and unauthorized packet injection into a local operational cluster:
+1. **AEAD Cipher**: ChaCha20-Poly1305 (RFC 8439) with a 256-bit symmetric `clusterKey`.
+2. **Header Authentication Binding (AAD)**: The entire 23-byte (or 31-byte) wire header—including `magic`, `version`, `type`, `flags`, `timestamp`, `payloadLength`, `senderId`, and optional `recipientId`—is passed as Authenticated Additional Data ($AAD$).
+3. **Nonce Construction**: A fresh 12-byte CSPRNG nonce is generated for every encrypted transmission.
+4. **Wire Representation**:
+
+```math
+\text{WirePayload} = \text{Nonce}_{12\text{B}} \parallel \text{Ciphertext}_{N\text{B}} \parallel \text{Tag}_{16\text{B}}
+```
+
+Any modification to the header flags, timestamp, or ciphertext causes Poly1305 verification failure, resulting in silent drop before payload parsing.
+
+### Layer 2: Record-Level Asymmetric Signatures (Ed25519)
+
+Cluster encryption protects over-the-air frames between immediate peers. However, in a multi-hop mesh network, intermediate relay nodes decrypt and forward packets. To ensure malicious or compromised relays cannot forge, alter, or backdate database records, every mutation is digitally signed by the original author.
+
+#### Canonical Signing Tuple
+
+For a record $R$, the canonical byte representation for signing is:
+
+```math
+M(R) = \text{collection} \parallel \text{id} \parallel \text{type} \parallel \text{hlcTimestamp} \parallel \text{payload}
+```
+
+#### Signature Generation
+
+The originating node signs $M(R)$ using its private Ed25519 key:
+
+```math
+\sigma = \text{Ed25519Sign}(\text{PrivateKey}_{author}, M(R))
+```
+
+The resulting 32-byte author public key and 64-byte signature $\sigma$ are attached directly to the `ChangeRecord`.
+
+#### Zero-Trust Verification Rule
+
+When a receiving node processes incoming records with `enforceSignatures = true`:
+
+```math
+\text{Valid}(R) = \begin{cases}
+1 & \text{if } \text{Ed25519Verify}(\text{PublicKey}_{author}, M(R), \sigma) = \text{true} \\
+0 & \text{otherwise}
+\end{cases}
+```
+
+If $\text{Valid}(R) = 0$, the mutation is dropped immediately. It is never applied to the local database adapter nor forwarded to downstream gossip peers.

@@ -47,6 +47,7 @@ AirDB strictly follows the [Conventional Commits v1.0.0](https://www.conventiona
 - `ble-ios`: Apple `AirDbKit`, CoreBluetooth driver (`AppleBleTransport`).
 - `sim`: Virtual BLE simulation transport (`SimulatedBleTransport`).
 - `adapter`: Adapter API, SQLite/Room/CoreData integration contracts.
+- `crypto`: Cryptographic mesh, ChaCha20-Poly1305 AEAD, Ed25519 signatures, HKDF.
 - `arch`: Architectural definitions, formal mathematical proofs.
 - `ci`: GitHub Actions workflows and build pipelines.
 

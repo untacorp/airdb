@@ -1,149 +1,180 @@
 # Getting Started with AirDB
 
-This guide walks you through integrating AirDB into an Android application (or Kotlin JVM service) to enable peer-to-peer database synchronization over Bluetooth Low Energy.
+This guide walks you through integrating AirDB into an Android application, Kotlin JVM service, or Apple application (iOS/macOS) to enable peer-to-peer database synchronization over Bluetooth Low Energy with zero-trust cryptographic guarantees.
 
 ---
 
 ## 1. Add Dependencies
 
-Add the AirDB modules to your application's `build.gradle.kts`:
+### Android & Kotlin JVM (`build.gradle.kts`)
 
 ```kotlin
 dependencies {
-    implementation("io.airdb:airdb-core:0.1.0")
-    implementation("io.airdb:airdb-adapter-api:0.1.0")
-    implementation("io.airdb:airdb-transport-ble:0.1.0")
+    implementation("io.airdb:airdb-core:0.2.0")
+    implementation("io.airdb:airdb-protocol:0.2.0")
+    implementation("io.airdb:airdb-crypto:0.2.0")
+    implementation("io.airdb:airdb-adapter-sqlite:0.2.0")
+    implementation("io.airdb:airdb-transport-ble:0.2.0")
 }
 ```
 
----
+### Apple Platforms (`Package.swift` or Xcode SPM)
 
-## 2. Implementing the Database Adapter
-
-AirDB does not dictate your local database technology. You connect your local database (e.g. Room, raw SQLite, or Realm) by implementing [`AirDbAdapter`](file:///home/auttomus/Documents/Code/PROJECT/ble-research/airdb/airdb-adapter-api/src/main/kotlin/io/airdb/adapter/AirDbAdapter.kt).
-
-### Example with Room / SQLite:
-
-Create a simple changelog table to track mutations:
-
-```sql
-CREATE TABLE airdb_changelog (
-    id TEXT NOT NULL,
-    collection TEXT NOT NULL,
-    mutation_type TEXT NOT NULL,
-    payload BLOB,
-    hlc_timestamp TEXT NOT NULL,
-    PRIMARY KEY (id, hlc_timestamp)
-);
-CREATE INDEX idx_changelog_hlc ON airdb_changelog(hlc_timestamp);
+```swift
+dependencies: [
+    .package(url: "https://github.com/untacorp/airdb.git", branch: "main")
+]
 ```
 
-Then implement `AirDbAdapter`:
+---
+
+## 2. Setting Up Durable SQLite Persistence
+
+AirDB provides out-of-the-box persistent storage via SQLite WAL mode, eliminating the need to write boilerplate database adapters.
+
+### Kotlin / Android:
 
 ```kotlin
-class RoomAirDbAdapter(private val database: AppDatabase) : AirDbAdapter {
+import io.airdb.adapter.sqlite.SqliteAirDbAdapter
 
-    override suspend fun getChangesSince(sinceHlcTimestamp: String?, limit: Int): List<ChangeRecord> {
-        val entities = if (sinceHlcTimestamp == null) {
-            database.changelogDao().getEarliestChanges(limit)
-        } else {
-            database.changelogDao().getChangesAfter(sinceHlcTimestamp, limit)
-        }
-        return entities.map { it.toChangeRecord() }
-    }
-
-    override suspend fun applyChanges(changes: List<ChangeRecord>) {
-        database.withTransaction {
-            for (change in changes) {
-                val current = database.changelogDao().getLatestForId(change.collection, change.id)
-
-                // Last-Write-Wins based on HLC string comparison
-                if (current == null || change.hlcTimestamp > current.hlcTimestamp) {
-                    database.changelogDao().upsert(change.toEntity())
-
-                    when (change.type) {
-                        MutationType.INSERT, MutationType.UPDATE -> {
-                            // Update domain entity table (e.g. survivors, inventory)
-                            database.survivorDao().upsert(Survivor.fromBytes(change.payload))
-                        }
-                        MutationType.DELETE -> {
-                            // Mark domain entity as deleted
-                            database.survivorDao().deleteById(change.id)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    override suspend fun getLatestHlc(): String? {
-        return database.changelogDao().getMaxHlc()
-    }
-}
+val dbFile = context.getDatabasePath("airdb_posko.db")
+val adapter = SqliteAirDbAdapter(dbPath = dbFile.absolutePath)
 ```
+
+### Apple Platforms / Swift:
+
+```swift
+import AirDbKit
+
+let dbPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    .appendingPathComponent("airdb_posko.db").path
+let adapter = try SqliteDbAdapter(databasePath: dbPath)
+```
+
+*(Note: If your application already uses Room, SQLDelight, GRDB, or CoreData, you can implement the clean [`AirDbAdapter`](file:///home/auttomus/Documents/Code/PROJECT/ble-research/airdb/airdb-adapter-api/src/main/kotlin/io/airdb/adapter/AirDbAdapter.kt) interface directly).*
 
 ---
 
-## 3. Configuring Bluetooth Permissions (Android)
+## 3. Configuring Cryptographic Keys (Zero-Trust Mesh)
 
-Declare the required Bluetooth permissions in your `AndroidManifest.xml`:
+AirDB protects data in flight using ChaCha20-Poly1305 AEAD and verifies record authenticity using Ed25519 digital signatures.
 
-```xml
-<!-- Required for Android 12+ (API 31+) -->
-<uses-permission android:name="android.permission.BLUETOOTH_SCAN"
-    android:usesPermissionFlags="neverForLocation" />
-<uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
-<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-
-<!-- Legacy permissions for Android 11 and below -->
-<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
-
-<uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
-```
-
----
-
-## 4. Initializing AirDbEngine
+### Kotlin / Android:
 
 ```kotlin
-// Create a stable or descriptive node identifier
-val nodeId = "posko-merapi-" + UUID.randomUUID().toString().take(6)
+import io.airdb.crypto.Ed25519Signer
+import io.airdb.crypto.HkdfSha256
 
-val adapter = RoomAirDbAdapter(myAppDatabase)
+// 1. Derive 256-bit symmetric AEAD cluster key from pre-shared secret
+val clusterKey = HkdfSha256.deriveKey(
+    ikm = "disaster-relief-cluster-secret".toByteArray(Charsets.UTF_8),
+    salt = "airdb-mesh-v1".toByteArray(Charsets.UTF_8),
+    info = "cluster-aead-key".toByteArray(Charsets.UTF_8)
+)
+
+// 2. Generate or load local device's Ed25519 signing key pair
+val authorKeyPair = Ed25519Signer.generateKeyPair()
+```
+
+### Apple Platforms / Swift:
+
+```swift
+import AirDbKit
+
+let clusterKey = try HkdfSha256.deriveKey(
+    secret: "disaster-relief-cluster-secret".data(using: .utf8)!,
+    salt: "airdb-mesh-v1".data(using: .utf8)!,
+    info: "cluster-aead-key".data(using: .utf8)!
+)
+
+let authorKeyPair = try Ed25519Signer.generateKeyPair()
+```
+
+---
+
+## 4. Initializing and Starting AirDbEngine
+
+### Android / Kotlin:
+
+```kotlin
+import io.airdb.core.engine.AirDbEngine
+import io.airdb.transport.ble.AndroidBleTransport
+
 val transport = AndroidBleTransport(context)
 
 val engine = AirDbEngine(
-    nodeName = nodeId,
+    nodeName = "posko-merapi-1",
     adapter = adapter,
-    transport = transport
+    transport = transport,
+    clusterKey = clusterKey,
+    authorKeyPair = authorKeyPair,
+    enforceSignatures = true
 )
 
-// Listen for sync completion events
+// Register listener for sync progress
 engine.addSyncListener { peerId, changeCount ->
-    Log.i("AirDB", "Applied $changeCount mutations from peer: $peerId")
+    Log.i("AirDB", "Applied $changeCount verified mutations from peer: $peerId")
 }
 
-// Start discovery & background sync
+// Start discovery and synchronization
+engine.start()
+```
+
+### Apple / Swift:
+
+```swift
+import AirDbKit
+
+let transport = CoreBluetoothTransport()
+
+let engine = AirDbEngine(
+    nodeName: "posko-merapi-ios-01",
+    adapter = adapter,
+    transport = transport,
+    clusterKey = clusterKey,
+    authorKeyPair = authorKeyPair,
+    enforceSignatures = true
+)
+
+engine.addSyncListener { peerId, changeCount in
+    print("Applied \(changeCount) verified mutations from peer: \(peerId)")
+}
+
 engine.start()
 ```
 
 ---
 
-## 5. Saving Mutations
+## 5. Saving and Propagating Mutations
 
-When your app creates, updates, or deletes records, invoke `engine.saveRecord()`:
+When your application creates, updates, or deletes records, invoke `engine.saveRecord()`:
+
+### Android / Kotlin:
 
 ```kotlin
-val survivorJson = """{"name": "Budi", "status": "Rescued"}"""
+import io.airdb.adapter.MutationType
+
+val triageJson = """{"patientId": "P-101", "name": "Budi", "triage": "YELLOW"}"""
 
 engine.saveRecord(
-    collection = "survivors",
-    id = "survivor-101",
+    collection = "triage_assessments",
+    id = "P-101",
     type = MutationType.INSERT,
-    payload = survivorJson.toByteArray(Charsets.UTF_8)
+    payload = triageJson.toByteArray(Charsets.UTF_8)
 )
 ```
 
-The mutation will be stamped with a monotonically increasing HLC timestamp and automatically propagated to any peer in BLE range!
+### Apple / Swift:
+
+```swift
+let triageJson = """{"patientId": "P-101", "name": "Budi", "triage": "YELLOW"}""".data(using: .utf8)!
+
+let record = try await engine.saveRecord(
+    collection: "triage_assessments",
+    id: "P-101",
+    type: .insert,
+    payload: triageJson
+)
+```
+
+The mutation is automatically stamped with a monotonic HLC timestamp, signed with the local private key, written to persistent storage, and synchronized to all discovered peers within BLE proximity.

@@ -8,9 +8,10 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0%2B-purple.svg)](https://kotlinlang.org)
 [![Swift](https://img.shields.io/badge/Swift-5.9%2B-orange.svg)](AirDbKit/)
 [![Architecture](https://img.shields.io/badge/Architecture-Sans--I%2FO-success.svg)](docs/ARCHITECTURE.md)
+[![Security](https://img.shields.io/badge/Security-Zero--Trust%20Mesh-blueviolet.svg)](docs/ARCHITECTURE.md#6-zero-trust-cryptographic-mesh--provenance)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](#testing)
 
-*Zero Internet. Zero Central Servers. Automatic Peer Reconciliation.*
+*Zero Internet. Zero Central Servers. Automatic Peer Reconciliation. Cryptographic Provenance.*
 
 </div>
 
@@ -31,111 +32,154 @@
 ## Key Capabilities
 
 - **Dual-Role BLE Concurrency**: Every device operates simultaneously as both a GATT Central (scanner) and GATT Peripheral (advertiser).
-- **Sans-I/O Layered Design**: Core causality logic, vector clocks, and wire codecs are 100% pure Kotlin with zero Android or socket dependencies.
+- **Sans-I/O Layered Design**: Core causality logic, vector clocks, and wire codecs are 100% pure Kotlin and pure Swift standard libraries with zero socket or platform framework leaks.
 - **Monotonic Hybrid Logical Clocks (HLC)**: Provides deterministic distributed causality and Last-Write-Wins (LWW) resolution without network time synchronization.
-- **Serialized In-Flight GATT Queue**: Enforces single-flight operation ordering per link, eliminating Android's native Bluetooth stack race conditions.
-- **Automated Compression & Framing**: Serializes compact binary packets, automatically compressing payloads (>256 B) via zlib and partitioning packets exceeding link MTU.
-- **Pluggable Database Adapter Seam**: Connects to any database engine (Room, SQLite, Realm, SQLCipher, or Key-Value stores) by implementing a single interface.
-- **Deterministic Sans-I/O Simulator**: Includes `airdb-transport-sim` to test complete multi-node sync topologies in memory in milliseconds without hardware radios.
+- **Zero-Trust Cryptographic Mesh**:
+  - **Cluster Symmetric AEAD (RFC 8439)**: Payloads are encrypted with ChaCha20-Poly1305 using a 256-bit cluster key, 12-byte CSPRNG nonce, and full packet headers bound as Authenticated Additional Data (AAD).
+  - **Record-Level Digital Signatures (RFC 8032)**: Every mutation is signed by the originating author with Ed25519 (32-byte public key, 64-byte signature), enabling non-repudiation and tamper prevention across untrusted mesh relay hops.
+  - **Key Derivation (RFC 5869)**: HKDF-SHA256 for deterministic key material and subkey derivation.
+- **Durable Local Persistence**: Built-in production SQLite storage engines (`airdb-adapter-sqlite` on Android/JVM and `SqliteDbAdapter` on Apple platforms) with Write-Ahead Logging (WAL), indexed HLC ranges, and atomic tombstone handling. Zero third-party package dependencies on Apple platforms via native `libsqlite3`.
+- **Serialized In-Flight GATT Queue**: Enforces single-flight operation ordering per link, eliminating native Bluetooth stack race conditions.
+- **Automated Compression & Framing**: Serializes compact binary packets, automatically compressing payloads (>256 B) via zlib Deflate and partitioning packets exceeding link MTU.
+- **Deterministic Sans-I/O Simulator**: Includes `airdb-transport-sim` and `SimulatedTransport` to test complete multi-node sync topologies in memory in milliseconds without hardware radios.
 
 ---
 
 ## Architecture
 
 ```
-+-------------------------------------------------------------+
-| Application / Local Database (Room, SQLite, In-Memory)      |
-+------------------------------+------------------------------+
-                               | Implements AirDbAdapter
-+------------------------------v------------------------------+
-| airdb-core (Causal Ordering & Reconciliation State Machine) |
-| - Hybrid Logical Clock (HLC)                                |
-| - Vector Clock Tracker                                      |
-| - SyncSession 4-Phase Protocol                              |
-+------------------------------+------------------------------+
-                               | Encodes/Decodes
-+------------------------------v------------------------------+
-| airdb-protocol (Binary Wire Codec & MTU Fragmentation)      |
-| - Fixed 15-byte Header + Variable Payload                   |
-| - zlib Deflate Compression                                  |
-| - 13-byte Fragment Envelope with AssemblyBuffer (30s TTL)   |
-+------------------------------+------------------------------+
-                               | Streams Bytes
-+------------------------------v------------------------------+
-| airdb-transport-api (Universal Transport Seam)              |
-|       ^                                        ^            |
-|       |                                        |            |
-| +-----+-----------------------+ +--------------+----------+ |
-| | airdb-transport-ble         | | airdb-transport-sim     | |
-| | (Android Native BLE Stack)  | | (Sans-I/O In-Memory     | |
-| | - GATT Central & Server     | |  Multi-node Simulator)  | |
-| | - Single-Flight Queue       | +-------------------------+ |
-| +-----------------------------+                             |
-+-------------------------------------------------------------+
++-------------------------------------------------------------------+
+| Application Layer (Local Domain Entities, Posko Triage, POS Data) |
++---------------------------------+---------------------------------+
+                                  |
++---------------------------------v---------------------------------+
+| airdb-adapter-sqlite / SqliteDbAdapter (Durable Persistence Seam) |
+| - Write-Ahead Logging (WAL) & ACID Transactions                   |
+| - Monotonic HLC Indexing (_airdb_changes)                         |
+| - Soft-Delete Tombstone Lifecycle Management                      |
++---------------------------------+---------------------------------+
+                                  | Implements AirDbAdapter
++---------------------------------v---------------------------------+
+| airdb-core / AirDbKit Core (Causality & Reconciliation Engine)     |
+| - Hybrid Logical Clock (HLC) & Vector Clock State Tracker         |
+| - 4-Phase SyncSession Protocol (Handshake, Reconcile, Delta, Ack) |
+| - Ed25519 Record Author Verification (Zero-Trust Enforcement)     |
++---------------------------------+---------------------------------+
+                                  | Signs / Verifies Records
++---------------------------------v---------------------------------+
+| airdb-crypto / AirDbKit Crypto (Zero-Trust Cryptographic Mesh)    |
+| - RFC 8439 ChaCha20-Poly1305 AEAD Symmetric Cipher                |
+| - RFC 8032 Ed25519 Digital Signature & Key Verification           |
+| - RFC 5869 HKDF-SHA256 Key Derivation Function                    |
++---------------------------------+---------------------------------+
+                                  | Encodes / Decodes
++---------------------------------v---------------------------------+
+| airdb-protocol / AirDbKit Protocol (Wire Codec & MTU Framing)     |
+| - 23/31-byte Header with Authenticated Additional Data (AAD)      |
+| - zlib Deflate Compression (>256 B Payloads)                      |
+| - 13-byte Fragment Envelope with AssemblyBuffer (30s TTL)         |
++---------------------------------+---------------------------------+
+                                  | Streams Bytes
++---------------------------------v---------------------------------+
+| Universal Transport Boundary (AirDbTransport)                     |
+|            ^                                     ^                |
+|            |                                     |                |
+| +----------+--------------------+   +------------+--------------+ |
+| | airdb-transport-ble           |   | airdb-transport-sim       | |
+| | CoreBluetoothTransport        |   | SimulatedTransport        | |
+| | (Android & Apple BLE Drivers) |   | (Sans-I/O In-Memory       | |
+| | - Central + Peripheral Roles  |   |  Multi-Node Mesh Lab)     | |
+| | - Single-Flight GATT Queue    |   +---------------------------+ |
+| | - Backpressure Flow Control   |                                 |
+| +-------------------------------+                                 |
++-------------------------------------------------------------------+
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Implement `AirDbAdapter` for Local Persistence
+### 1. Initialize Durable SQLite Adapter & Cryptographic Keys
 
 ```kotlin
-class RoomAirDbAdapter(private val database: AppDatabase) : AirDbAdapter {
+// 1. Initialize SQLite persistence adapter
+val adapter = SqliteAirDbAdapter(dbPath = "/data/data/com.example.app/databases/airdb.db")
 
-    override suspend fun getChangesSince(sinceHlcTimestamp: String?, limit: Int): List<ChangeRecord> {
-        return database.changelogDao().getChangesAfter(sinceHlcTimestamp ?: "", limit)
-            .map { it.toChangeRecord() }
-    }
+// 2. Derive cluster encryption key and node signing key pair
+val clusterKey = HkdfSha256.deriveKey(
+    ikm = "emergency-posko-cluster-shared-secret".toByteArray(Charsets.UTF_8),
+    salt = "airdb-mesh-v1".toByteArray(Charsets.UTF_8),
+    info = "cluster-aead-key".toByteArray(Charsets.UTF_8)
+)
+val authorKeyPair = Ed25519Signer.generateKeyPair()
 
-    override suspend fun applyChanges(changes: List<ChangeRecord>) {
-        database.withTransaction {
-            for (change in changes) {
-                val current = database.changelogDao().getLatestForId(change.collection, change.id)
-                if (current == null || change.hlcTimestamp > current.hlcTimestamp) {
-                    database.changelogDao().upsert(change.toEntity())
-                    if (change.type == MutationType.DELETE) {
-                        database.survivorDao().deleteById(change.id)
-                    } else {
-                        database.survivorDao().upsert(Survivor.fromBytes(change.payload))
-                    }
-                }
-            }
-        }
-    }
-
-    override suspend fun getLatestHlc(): String? {
-        return database.changelogDao().getMaxHlc()
-    }
-}
-```
-
-### 2. Initialize and Start AirDB
-
-```kotlin
-val adapter = RoomAirDbAdapter(myAppDatabase)
+// 3. Initialize transport and engine
 val transport = AndroidBleTransport(context)
-
 val engine = AirDbEngine(
     nodeName = "posko-merapi-1",
     adapter = adapter,
-    transport = transport
+    transport = transport,
+    clusterKey = clusterKey,
+    authorKeyPair = authorKeyPair,
+    enforceSignatures = true
 )
 
-// Listen for sync completion events
+// 4. Register sync completion listener
 engine.addSyncListener { peerId, changeCount ->
-    Log.i("AirDB", "Applied $changeCount mutations from peer: $peerId")
+    Log.i("AirDB", "Applied $changeCount verified mutations from peer: $peerId")
 }
 
-// Start discovery & background sync
+// 5. Start radio operations
 engine.start()
 
-// Record a new local mutation
+// 6. Record a local mutation (automatically signed with authorKeyPair)
+val survivorJson = """{"name": "Budi", "status": "Rescued", "triage": "GREEN"}"""
 engine.saveRecord(
     collection = "survivors",
     id = "survivor-101",
     type = MutationType.INSERT,
-    payload = jsonString.toByteArray()
+    payload = survivorJson.toByteArray(Charsets.UTF_8)
+)
+```
+
+### 2. Apple Platforms (Swift / AirDbKit)
+
+```swift
+import AirDbKit
+
+// 1. Initialize durable native SQLite persistence
+let dbPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    .appendingPathComponent("airdb.db").path
+let adapter = try SqliteDbAdapter(databasePath: dbPath)
+
+// 2. Generate or load cryptographic keys
+let clusterKey = try HkdfSha256.deriveKey(
+    secret: "emergency-posko-cluster-shared-secret".data(using: .utf8)!,
+    salt: "airdb-mesh-v1".data(using: .utf8)!,
+    info: "cluster-aead-key".data(using: .utf8)!
+)
+let authorKeyPair = try Ed25519Signer.generateKeyPair()
+
+// 3. Initialize CoreBluetooth transport & engine
+let transport = CoreBluetoothTransport()
+let engine = AirDbEngine(
+    nodeName: "posko-merapi-ios-01",
+    adapter = adapter,
+    transport = transport,
+    clusterKey: clusterKey,
+    authorKeyPair: authorKeyPair,
+    enforceSignatures: true
+)
+
+// 4. Start radio operations and record mutations
+engine.start()
+
+let payload = """{"name": "Siti", "status": "Treated"}""".data(using: .utf8)!
+let record = try await engine.saveRecord(
+    collection: "survivors",
+    id: "survivor-102",
+    type: .insert,
+    payload: payload
 )
 ```
 
@@ -146,22 +190,30 @@ engine.saveRecord(
 | Module | Description | Dependencies |
 |---|---|---|
 | [`airdb-adapter-api`](airdb-adapter-api/) | Core database abstraction contracts (`AirDbAdapter`, `ChangeRecord`). | Pure Kotlin |
-| [`airdb-protocol`](airdb-protocol/) | Binary packet framing, zlib compression, and MTU fragmentation buffer. | Pure Kotlin |
-| [`airdb-core`](airdb-core/) | HLC, Vector Clock, and 4-phase synchronization state machine. | Pure Kotlin |
+| [`airdb-adapter-sqlite`](airdb-adapter-sqlite/) | Durable SQLite persistence engine with WAL mode and schema migrations. | Kotlin / SQLite3 |
+| [`airdb-crypto`](airdb-crypto/) | RFC 8439 ChaCha20-Poly1305, RFC 8032 Ed25519 signatures, RFC 5869 HKDF. | Pure Kotlin / Java 17 JCA |
+| [`airdb-protocol`](airdb-protocol/) | Binary packet framing, AEAD AAD binding, zlib compression, and MTU fragmentation buffer. | Pure Kotlin |
+| [`airdb-core`](airdb-core/) | HLC, Vector Clock, and 4-phase synchronization state machine with signature verification. | Pure Kotlin |
 | [`airdb-transport-api`](airdb-transport-api/) | P2P transport interfaces, events, and commands. | Pure Kotlin |
 | [`airdb-transport-sim`](airdb-transport-sim/) | In-memory packet radio mesh simulator for fast automated tests. | Pure Kotlin |
 | [`airdb-transport-ble`](airdb-transport-ble/) | Production Android BLE GATT server/client and anti-race queue. | Android SDK / Kotlin |
 | [`airdb-samples`](airdb-samples/) | Runnable CLI simulation demos demonstrating multi-node sync. | Kotlin |
-| [`AirDbKit`](AirDbKit/) | Native Swift package for iOS, macOS, watchOS with CoreBluetooth support. | Swift 5.9+ / Apple SDK |
+| [`AirDbKit`](AirDbKit/) | Native Swift package for iOS, macOS, watchOS with CoreBluetooth, native SQLite3, and CryptoKit. | Swift 5.9+ / Apple SDK |
 
 ---
 
 ## Testing
 
-AirDB embraces a **Sans-I/O testing discipline**. You can run the entire multi-node test suite without physical hardware:
+AirDB embraces a **Sans-I/O testing discipline**. You can run the entire JVM test suite without physical hardware:
 
 ```bash
 ./gradlew test
+```
+
+To run the Apple test suite on macOS:
+
+```bash
+cd AirDbKit && swift test
 ```
 
 To run the interactive off-grid disaster response sync simulation:
@@ -174,12 +226,18 @@ To run the interactive off-grid disaster response sync simulation:
 
 ## Documentation Directory
 
-- [Architecture Guide](docs/ARCHITECTURE.md): Concurrency, Sans-I/O, and causality contracts.
-- [Wire Protocol Specification](docs/PROTOCOL_SPEC.md): Binary packet layouts and fragment headers.
-- [Getting Started Guide](docs/GETTING_STARTED.md): Step-by-step Room/SQLite integration guide.
+- [Architecture Guide](docs/ARCHITECTURE.md): Concurrency, Sans-I/O, causality contracts, and cryptographic mesh.
+- [Wire Protocol Specification](docs/PROTOCOL_SPEC.md): Binary packet layouts, AEAD framing, and fragment headers.
+- [Getting Started Guide](docs/GETTING_STARTED.md): Step-by-step Room, SQLite, and AirDbKit integration guide.
 - [Coding Standards](docs/CODING_STANDARDS.md): Guidelines on concurrency, immutability, and tests.
-- [Frequently Asked Questions (FAQ)](docs/FAQ.md): Detailed answers to operational and design questions.
-- [Architecture Decision Records (ADR)](docs/adr/): Context and justifications for foundational decisions.
+- [Frequently Asked Questions (FAQ)](docs/FAQ.md): Detailed answers to operational, security, and design questions.
+- [Security Policy](SECURITY.md): Threat modeling, cryptographic guarantees, and disclosure procedures.
+- [Architecture Decision Records (ADR)](docs/adr/): Context and justifications for foundational decisions:
+  - [ADR 0001: Sans-I/O Architecture](docs/adr/0001-sans-io-architecture.md)
+  - [ADR 0002: HLC Conflict Resolution](docs/adr/0002-hlc-conflict-resolution.md)
+  - [ADR 0003: Single-Flight GATT Queue](docs/adr/0003-single-flight-gatt-queue.md)
+  - [ADR 0004: Durable SQLite Persistence Seam](docs/adr/0004-sqlite-persistence-seam.md)
+  - [ADR 0005: Zero-Trust Cryptographic Mesh](docs/adr/0005-zero-trust-cryptographic-mesh.md)
 
 ---
 
