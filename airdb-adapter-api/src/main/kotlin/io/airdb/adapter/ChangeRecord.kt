@@ -26,14 +26,20 @@ import java.util.Arrays
  * @property type Type of mutation: INSERT, UPDATE, or DELETE.
  * @property payload Serialized representation of the entity (JSON, Protobuf, or raw bytes). Empty for DELETE.
  * @property hlcTimestamp Hybrid Logical Clock timestamp string representing causality (e.g. "1710928300000-0-nodeA").
+ * @property authorPublicKey Optional 32-byte Ed25519 public key of the node that authored this change.
+ * @property signature Optional 64-byte Ed25519 digital signature verifying the change's provenance.
  */
 data class ChangeRecord(
     val id: String,
     val collection: String,
     val type: MutationType,
     val payload: ByteArray,
-    val hlcTimestamp: String
+    val hlcTimestamp: String,
+    val authorPublicKey: ByteArray? = null,
+    val signature: ByteArray? = null
 ) {
+    val isSigned: Boolean get() = authorPublicKey != null && signature != null
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
@@ -45,6 +51,8 @@ data class ChangeRecord(
         if (type != other.type) return false
         if (!payload.contentEquals(other.payload)) return false
         if (hlcTimestamp != other.hlcTimestamp) return false
+        if (!Arrays.equals(authorPublicKey, other.authorPublicKey)) return false
+        if (!Arrays.equals(signature, other.signature)) return false
 
         return true
     }
@@ -55,10 +63,12 @@ data class ChangeRecord(
         result = 31 * result + type.hashCode()
         result = 31 * result + payload.contentHashCode()
         result = 31 * result + hlcTimestamp.hashCode()
+        result = 31 * result + (authorPublicKey?.contentHashCode() ?: 0)
+        result = 31 * result + (signature?.contentHashCode() ?: 0)
         return result
     }
 
     override fun toString(): String {
-        return "ChangeRecord(id='$id', collection='$collection', type=$type, payloadSize=${payload.size}, hlc='$hlcTimestamp')"
+        return "ChangeRecord(id='$id', collection='$collection', type=$type, payloadSize=${payload.size}, hlc='$hlcTimestamp', isSigned=$isSigned)"
     }
 }

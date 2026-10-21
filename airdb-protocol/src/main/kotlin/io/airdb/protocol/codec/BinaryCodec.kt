@@ -16,6 +16,7 @@
 
 package io.airdb.protocol.codec
 
+import io.airdb.crypto.ChaCha20Poly1305Cipher
 import io.airdb.protocol.packet.AirDbPacket
 import io.airdb.protocol.packet.PacketFlags
 import io.airdb.protocol.packet.PacketType
@@ -37,12 +38,21 @@ object BinaryCodec {
 
     /**
      * Serializes an [AirDbPacket] into binary representation for BLE transmission.
+     *
+     * @param packet Packet to serialize.
+     * @param clusterKey Optional 256-bit (32-byte) AEAD symmetric key. If supplied, payload is encrypted
+     *                   using ChaCha20-Poly1305 with the packet header as Authenticated Additional Data.
+     * @param autoCompressThreshold Minimum uncompressed payload length triggering Deflate compression.
      */
-    fun encode(packet: AirDbPacket, autoCompressThreshold: Int = 256): ByteArray {
+    fun encode(
+        packet: AirDbPacket,
+        clusterKey: ByteArray? = null,
+        autoCompressThreshold: Int = 256
+    ): ByteArray {
         var flags = packet.flags.toInt()
         var payloadBytes = packet.payload
 
-        // Auto compress if payload is above threshold and not already marked compressed
+        // 1. Auto compress if payload is above threshold and not already marked compressed
         if (payloadBytes.size > autoCompressThreshold && (flags and PacketFlags.FLAG_COMPRESSED.toInt()) == 0) {
             val compressed = Compression.compress(payloadBytes)
             if (compressed.size < payloadBytes.size) {
@@ -55,36 +65,72 @@ object BinaryCodec {
             flags = flags or PacketFlags.FLAG_HAS_RECIPIENT.toInt()
         }
 
-        require(payloadBytes.size <= MAX_PAYLOAD_SIZE) {
-            "Payload exceeds max allowable size $MAX_PAYLOAD_SIZE: ${payloadBytes.size}"
-        }
-
         val hasRecipient = packet.recipientId != null
-        val totalSize = MIN_HEADER_SIZE + (if (hasRecipient) RECIPIENT_ID_SIZE else 0) + payloadBytes.size
+        val headerSize = MIN_HEADER_SIZE + (if (hasRecipient) RECIPIENT_ID_SIZE else 0)
 
-        val buffer = ByteBuffer.allocate(totalSize).order(ByteOrder.BIG_ENDIAN)
-        buffer.put(MAGIC_BYTE_0)
-        buffer.put(MAGIC_BYTE_1)
-        buffer.put(packet.version)
-        buffer.put(packet.type.code)
-        buffer.put(flags.toByte())
-        buffer.putLong(packet.timestamp)
-        buffer.putShort(payloadBytes.size.toShort())
-        buffer.putLong(packet.senderId)
+        // 2. Encrypt if clusterKey provided
+        if (clusterKey != null) {
+            flags = flags or PacketFlags.FLAG_ENCRYPTED.toInt()
+            val encryptedLength = payloadBytes.size + ChaCha20Poly1305Cipher.NONCE_SIZE + ChaCha20Poly1305Cipher.TAG_SIZE
+            require(encryptedLength <= MAX_PAYLOAD_SIZE) {
+                "Encrypted payload exceeds max allowable size $MAX_PAYLOAD_SIZE: $encryptedLength"
+            }
 
-        if (hasRecipient) {
-            buffer.putLong(packet.recipientId!!)
+            // Construct exact header bytes to serve as Authenticated Additional Data (AAD)
+            val headerBuffer = ByteBuffer.allocate(headerSize).order(ByteOrder.BIG_ENDIAN)
+            headerBuffer.put(MAGIC_BYTE_0)
+            headerBuffer.put(MAGIC_BYTE_1)
+            headerBuffer.put(packet.version)
+            headerBuffer.put(packet.type.code)
+            headerBuffer.put(flags.toByte())
+            headerBuffer.putLong(packet.timestamp)
+            headerBuffer.putShort(encryptedLength.toShort())
+            headerBuffer.putLong(packet.senderId)
+
+            if (hasRecipient) {
+                headerBuffer.putLong(packet.recipientId!!)
+            }
+
+            val aad = headerBuffer.array()
+            val encryptedPayload = ChaCha20Poly1305Cipher.encrypt(payloadBytes, clusterKey, aad)
+
+            val totalBuffer = ByteBuffer.allocate(headerSize + encryptedPayload.size).order(ByteOrder.BIG_ENDIAN)
+            totalBuffer.put(aad)
+            totalBuffer.put(encryptedPayload)
+            return totalBuffer.array()
+        } else {
+            require(payloadBytes.size <= MAX_PAYLOAD_SIZE) {
+                "Payload exceeds max allowable size $MAX_PAYLOAD_SIZE: ${payloadBytes.size}"
+            }
+
+            val totalSize = headerSize + payloadBytes.size
+            val buffer = ByteBuffer.allocate(totalSize).order(ByteOrder.BIG_ENDIAN)
+            buffer.put(MAGIC_BYTE_0)
+            buffer.put(MAGIC_BYTE_1)
+            buffer.put(packet.version)
+            buffer.put(packet.type.code)
+            buffer.put(flags.toByte())
+            buffer.putLong(packet.timestamp)
+            buffer.putShort(payloadBytes.size.toShort())
+            buffer.putLong(packet.senderId)
+
+            if (hasRecipient) {
+                buffer.putLong(packet.recipientId!!)
+            }
+
+            buffer.put(payloadBytes)
+            return buffer.array()
         }
-
-        buffer.put(payloadBytes)
-        return buffer.array()
     }
 
     /**
      * Deserializes binary wire data into an [AirDbPacket].
-     * Returns null if data is corrupt or does not match AirDB framing.
+     * Returns null if data is corrupt, authentication tag fails, or does not match AirDB framing.
+     *
+     * @param bytes Serialized wire packet bytes.
+     * @param clusterKey Optional 256-bit (32-byte) AEAD symmetric key for decrypting encrypted packets.
      */
-    fun decode(bytes: ByteArray): AirDbPacket? {
+    fun decode(bytes: ByteArray, clusterKey: ByteArray? = null): AirDbPacket? {
         if (bytes.size < MIN_HEADER_SIZE) return null
 
         val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
@@ -109,10 +155,25 @@ object BinaryCodec {
             null
         }
 
+        val headerSize = MIN_HEADER_SIZE + (if (hasRecipient) RECIPIENT_ID_SIZE else 0)
         if (buffer.remaining() < payloadLength) return null
 
         var payload = ByteArray(payloadLength)
         buffer.get(payload)
+
+        // Decrypt if encrypted
+        val isEncrypted = (flags.toInt() and PacketFlags.FLAG_ENCRYPTED.toInt()) != 0
+        if (isEncrypted) {
+            if (clusterKey == null) {
+                return null
+            }
+            val aad = bytes.copyOfRange(0, headerSize)
+            try {
+                payload = ChaCha20Poly1305Cipher.decrypt(payload, clusterKey, aad)
+            } catch (e: Exception) {
+                return null
+            }
+        }
 
         // Decompress if compressed
         val isCompressed = (flags.toInt() and PacketFlags.FLAG_COMPRESSED.toInt()) != 0

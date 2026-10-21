@@ -24,8 +24,11 @@ import java.nio.ByteOrder
 
 /**
  * Binary serialization utility for batches of [ChangeRecord] objects.
+ * Supports both unsigned and Ed25519 digitally signed records.
  */
 object DeltaBatch {
+
+    private const val FLAG_RECORD_SIGNED = 0x80
 
     fun serialize(changes: List<ChangeRecord>): ByteArray {
         val out = ByteArrayOutputStream()
@@ -38,6 +41,16 @@ object DeltaBatch {
             val collBytes = change.collection.toByteArray(Charsets.UTF_8)
             val hlcBytes = change.hlcTimestamp.toByteArray(Charsets.UTF_8)
 
+            val isSigned = change.isSigned &&
+                    change.authorPublicKey?.size == 32 &&
+                    change.signature?.size == 64
+
+            val typeByte = if (isSigned) {
+                ((change.type.ordinal and 0x7F) or FLAG_RECORD_SIGNED).toByte()
+            } else {
+                (change.type.ordinal and 0x7F).toByte()
+            }
+
             // Header for single change:
             // IdLen(2) + Id + CollLen(2) + Coll + Type(1) + HlcLen(2) + Hlc + PayloadLen(4) + Payload
             val buf = ByteBuffer.allocate(2 + idBytes.size + 2 + collBytes.size + 1 + 2 + hlcBytes.size + 4)
@@ -47,13 +60,18 @@ object DeltaBatch {
             buf.put(idBytes)
             buf.putShort(collBytes.size.toShort())
             buf.put(collBytes)
-            buf.put(change.type.ordinal.toByte())
+            buf.put(typeByte)
             buf.putShort(hlcBytes.size.toShort())
             buf.put(hlcBytes)
             buf.putInt(change.payload.size)
 
             out.write(buf.array())
             out.write(change.payload)
+
+            if (isSigned) {
+                out.write(change.authorPublicKey!!)
+                out.write(change.signature!!)
+            }
         }
 
         return out.toByteArray()
@@ -81,7 +99,9 @@ object DeltaBatch {
             val collection = String(collBytes, Charsets.UTF_8)
 
             if (buffer.remaining() < 1) break
-            val typeOrdinal = buffer.get().toInt() and 0xFF
+            val rawType = buffer.get().toInt() and 0xFF
+            val isSigned = (rawType and FLAG_RECORD_SIGNED) != 0
+            val typeOrdinal = rawType and 0x7F
             val type = MutationType.entries.getOrElse(typeOrdinal) { MutationType.UPDATE }
 
             if (buffer.remaining() < 2) break
@@ -97,13 +117,28 @@ object DeltaBatch {
             val payload = ByteArray(payloadLen)
             buffer.get(payload)
 
+            var authorPublicKey: ByteArray? = null
+            var signature: ByteArray? = null
+
+            if (isSigned) {
+                if (buffer.remaining() < 32 + 64) break
+                val pubKey = ByteArray(32)
+                buffer.get(pubKey)
+                val sig = ByteArray(64)
+                buffer.get(sig)
+                authorPublicKey = pubKey
+                signature = sig
+            }
+
             changes.add(
                 ChangeRecord(
                     id = id,
                     collection = collection,
                     type = type,
                     payload = payload,
-                    hlcTimestamp = hlcTimestamp
+                    hlcTimestamp = hlcTimestamp,
+                    authorPublicKey = authorPublicKey,
+                    signature = signature
                 )
             )
         }

@@ -17,7 +17,10 @@
 import Foundation
 
 /// Binary serialization utility for batches of ChangeRecord mutations.
+/// Supports both unsigned and Ed25519 digitally signed records.
 public enum DeltaBatch {
+
+    private static let flagRecordSigned: UInt8 = 0x80
 
     public static func serialize(_ changes: [ChangeRecord]) -> Data {
         var data = Data()
@@ -28,6 +31,14 @@ public enum DeltaBatch {
             let idData = Data(change.id.utf8)
             let collData = Data(change.collection.utf8)
             let hlcData = Data(change.hlcTimestamp.utf8)
+
+            let isSigned = change.isSigned &&
+                change.authorPublicKey?.count == 32 &&
+                change.signature?.count == 64
+
+            let typeByte: UInt8 = isSigned
+                ? ((change.type.rawValue & 0x7F) | flagRecordSigned)
+                : (change.type.rawValue & 0x7F)
 
             var idLen = UInt16(idData.count).bigEndian
             var collLen = UInt16(collData.count).bigEndian
@@ -40,13 +51,18 @@ public enum DeltaBatch {
             data.append(contentsOf: withUnsafeBytes(of: &collLen) { Array($0) })
             data.append(collData)
 
-            data.append(change.type.rawValue)
+            data.append(typeByte)
 
             data.append(contentsOf: withUnsafeBytes(of: &hlcLen) { Array($0) })
             data.append(hlcData)
 
             data.append(contentsOf: withUnsafeBytes(of: &payloadLen) { Array($0) })
             data.append(change.payload)
+
+            if isSigned, let pubKey = change.authorPublicKey, let sig = change.signature {
+                data.append(pubKey)
+                data.append(sig)
+            }
         }
 
         return data
@@ -80,8 +96,10 @@ public enum DeltaBatch {
             offset += collLen
 
             guard offset + 1 <= data.count else { break }
-            let typeRaw = data[offset]
-            let type = MutationType(rawValue: typeRaw) ?? .update
+            let rawType = data[offset]
+            let isSigned = (rawType & flagRecordSigned) != 0
+            let typeOrdinal = rawType & 0x7F
+            let type = MutationType(rawValue: typeOrdinal) ?? .update
             offset += 1
 
             guard offset + 2 <= data.count else { break }
@@ -100,13 +118,25 @@ public enum DeltaBatch {
             let payload = data.subdata(in: offset..<(offset + payloadLen))
             offset += payloadLen
 
+            var authorPublicKey: Data? = nil
+            var signature: Data? = nil
+            if isSigned {
+                guard offset + 32 + 64 <= data.count else { break }
+                authorPublicKey = data.subdata(in: offset..<(offset + 32))
+                offset += 32
+                signature = data.subdata(in: offset..<(offset + 64))
+                offset += 64
+            }
+
             changes.append(
                 ChangeRecord(
                     id: id,
                     collection: coll,
                     type: type,
                     payload: payload,
-                    hlcTimestamp: hlc
+                    hlcTimestamp: hlc,
+                    authorPublicKey: authorPublicKey,
+                    signature: signature
                 )
             )
         }

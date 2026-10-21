@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation(project(":airdb-adapter-api"))
+    implementation(project(":airdb-crypto"))
     implementation(project(":airdb-protocol"))
     implementation(project(":airdb-transport-api"))
     implementation(libs.kotlin.stdlib)

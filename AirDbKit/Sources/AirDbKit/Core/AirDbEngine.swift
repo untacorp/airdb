@@ -24,6 +24,9 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
     public let vectorClock = VectorClock()
     public let adapter: AirDbAdapter
     public let transport: AirDbTransport
+    public let clusterKey: Data?
+    public let authorKeyPair: Ed25519KeyPair?
+    public let enforceSignatures: Bool
 
     private let lock = NSLock()
     private var sessions: [String: SyncSession] = [:]
@@ -33,13 +36,19 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
     public init(
         nodeName: String,
         adapter: AirDbAdapter,
-        transport: AirDbTransport
+        transport: AirDbTransport,
+        clusterKey: Data? = nil,
+        authorKeyPair: Ed25519KeyPair? = nil,
+        enforceSignatures: Bool = false
     ) {
         self.nodeName = nodeName
         self.localNodeId = AirDbEngine.deterministicNodeId(from: nodeName)
         self.clock = HybridLogicalClock(nodeId: nodeName)
         self.adapter = adapter
         self.transport = transport
+        self.clusterKey = clusterKey
+        self.authorKeyPair = authorKeyPair
+        self.enforceSignatures = enforceSignatures
 
         self.transport.setListener(self)
     }
@@ -81,13 +90,6 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
     }
 
     /// Records a local mutation (INSERT/UPDATE/DELETE) in the database with an authoritative HLC timestamp.
-    ///
-    /// - Parameters:
-    ///   - collection: Table or collection name.
-    ///   - id: Unique record identifier.
-    ///   - type: Mutation type (insert, update, delete).
-    ///   - payload: Serialized record body.
-    /// - Returns: The created ``ChangeRecord`` stamped with its HLC.
     @discardableResult
     public func saveRecord(
         collection: String,
@@ -96,26 +98,54 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
         payload: Data
     ) async throws -> ChangeRecord {
         let hlc = clock.now().description
-        vectorClock.update(nodeId: nodeName, hlcTimestamp: hlc)
-        let record = ChangeRecord(
+        vectorClock.update(nodeId: nodeName, timestamp: hlc)
+
+        var record = ChangeRecord(
             id: id,
             collection: collection,
             type: type,
             payload: payload,
             hlcTimestamp: hlc
         )
+
+        if let keyPair = authorKeyPair {
+            record = try record.signed(with: keyPair)
+        }
+
         try await adapter.applyChanges([record])
 
-        // Immediately trigger real-time delta streaming on active sessions
-        let activeSessions = lock.withScopedLock { Array(sessions.values) }
+        let activeSessions: [SyncSession]
+        lock.lock()
+        activeSessions = Array(sessions.values)
+        lock.unlock()
 
         for session in activeSessions {
-            Task {
-                await session.notifyLocalMutation()
-            }
+            await session.notifyLocalMutation()
         }
 
         return record
+    }
+
+    /// Convenience insert/update saving serialized String UTF-8 payload.
+    @discardableResult
+    public func put(collection: String, id: String, jsonString: String) async throws -> ChangeRecord {
+        try await saveRecord(
+            collection: collection,
+            id: id,
+            type: .update,
+            payload: Data(jsonString.utf8)
+        )
+    }
+
+    /// Convenience soft-delete saving empty tombstone payload.
+    @discardableResult
+    public func delete(collection: String, id: String) async throws -> ChangeRecord {
+        try await saveRecord(
+            collection: collection,
+            id: id,
+            type: .delete,
+            payload: Data()
+        )
     }
 
     /// Registers a callback listener invoked whenever changes are applied from a peer.
@@ -138,7 +168,10 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
                 adapter: adapter,
                 clock: clock,
                 vectorClock: vectorClock,
-                transport: transport
+                transport: transport,
+                clusterKey: clusterKey,
+                authorKeyPair: authorKeyPair,
+                enforceSignatures: enforceSignatures
             ) { [weak self] pId, changeCount in
                 guard let self = self else { return }
                 let listeners = self.lock.withScopedLock { self.syncListeners }
@@ -173,7 +206,10 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
                     adapter: adapter,
                     clock: clock,
                     vectorClock: vectorClock,
-                    transport: transport
+                    transport: transport,
+                    clusterKey: clusterKey,
+                    authorKeyPair: authorKeyPair,
+                    enforceSignatures: enforceSignatures
                 ) { [weak self] pId, changeCount in
                     guard let self = self else { return }
                     let listeners = self.lock.withScopedLock { self.syncListeners }
@@ -189,8 +225,8 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
                 await session.handlePacket(packet)
             }
 
-        default:
-            break
+        case .peerDiscovered(let peerId, _):
+            transport.connect(peerId: peerId)
         }
     }
 }

@@ -22,9 +22,10 @@ public enum PacketFragmenter {
 
     public static func fragment(
         packet: AirDbPacket,
+        clusterKey: Data? = nil,
         maxChunkSize: Int = defaultMaxChunkSize
     ) -> [AirDbPacket] {
-        let encodedBytes = BinaryCodec.encode(packet)
+        let encodedBytes = BinaryCodec.encode(packet, clusterKey: clusterKey)
         if encodedBytes.count <= maxChunkSize {
             return [packet]
         }

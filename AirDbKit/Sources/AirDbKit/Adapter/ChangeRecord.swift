@@ -30,16 +30,64 @@ public struct ChangeRecord: Sendable, Hashable, CustomStringConvertible {
     public let type: MutationType
     public let payload: Data
     public let hlcTimestamp: String
+    public let authorPublicKey: Data?
+    public let signature: Data?
 
-    public init(id: String, collection: String, type: MutationType, payload: Data, hlcTimestamp: String) {
+    public init(
+        id: String,
+        collection: String,
+        type: MutationType,
+        payload: Data,
+        hlcTimestamp: String,
+        authorPublicKey: Data? = nil,
+        signature: Data? = nil
+    ) {
         self.id = id
         self.collection = collection
         self.type = type
         self.payload = payload
         self.hlcTimestamp = hlcTimestamp
+        self.authorPublicKey = authorPublicKey
+        self.signature = signature
+    }
+
+    public var isSigned: Bool {
+        authorPublicKey != nil && signature != nil
+    }
+
+    public func verifySignature() -> Bool {
+        guard let pubKey = authorPublicKey, let sig = signature else { return false }
+        let digest = Ed25519Signer.canonicalChangeDigest(
+            id: id,
+            collection: collection,
+            typeOrdinal: type.rawValue,
+            hlcTimestamp: hlcTimestamp,
+            payload: payload
+        )
+        return Ed25519Signer.verify(message: digest, signature: sig, publicKeyRaw: pubKey)
+    }
+
+    public func signed(with keyPair: Ed25519KeyPair) throws -> ChangeRecord {
+        let digest = Ed25519Signer.canonicalChangeDigest(
+            id: id,
+            collection: collection,
+            typeOrdinal: type.rawValue,
+            hlcTimestamp: hlcTimestamp,
+            payload: payload
+        )
+        let sig = try Ed25519Signer.sign(message: digest, privateKeyRaw: keyPair.privateKeyRaw)
+        return ChangeRecord(
+            id: id,
+            collection: collection,
+            type: type,
+            payload: payload,
+            hlcTimestamp: hlcTimestamp,
+            authorPublicKey: keyPair.publicKeyRaw,
+            signature: sig
+        )
     }
 
     public var description: String {
-        "ChangeRecord(id: '\(id)', collection: '\(collection)', type: \(type), payloadBytes: \(payload.count), hlc: '\(hlcTimestamp)')"
+        "ChangeRecord(id: '\(id)', collection: '\(collection)', type: \(type), payloadBytes: \(payload.count), hlc: '\(hlcTimestamp)', isSigned: \(isSigned))"
     }
 }

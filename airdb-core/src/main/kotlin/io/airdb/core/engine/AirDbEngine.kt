@@ -23,6 +23,8 @@ import io.airdb.core.clock.HybridLogicalClock
 import io.airdb.transport.AirDbTransport
 import io.airdb.transport.TransportEvent
 import io.airdb.transport.TransportListener
+import io.airdb.core.model.sign
+import io.airdb.crypto.Ed25519KeyPair
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,6 +44,9 @@ class AirDbEngine(
     val nodeName: String,
     val adapter: AirDbAdapter,
     val transport: AirDbTransport,
+    val clusterKey: ByteArray? = null,
+    val authorKeyPair: Ed25519KeyPair? = null,
+    val enforceSignatures: Boolean = false,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) : TransportListener {
 
@@ -94,13 +99,16 @@ class AirDbEngine(
     ): ChangeRecord {
         val hlc = clock.now().toString()
         vectorClock.update(nodeName, hlc)
-        val record = ChangeRecord(
+        var record = ChangeRecord(
             id = id,
             collection = collection,
             type = type,
             payload = payload,
             hlcTimestamp = hlc
         )
+        if (authorKeyPair != null) {
+            record = record.sign(authorKeyPair)
+        }
         adapter.applyChanges(listOf(record))
 
         // Immediately trigger real-time delta streaming on active sessions
@@ -127,7 +135,10 @@ class AirDbEngine(
                     clock = clock,
                     vectorClock = vectorClock,
                     transport = transport,
-                    scope = scope
+                    scope = scope,
+                    clusterKey = clusterKey,
+                    authorKeyPair = authorKeyPair,
+                    enforceSignatures = enforceSignatures
                 ) { peerId, changesApplied ->
                     syncListeners.forEach { it(peerId, changesApplied) }
                 }
@@ -150,7 +161,10 @@ class AirDbEngine(
                         clock = clock,
                         vectorClock = vectorClock,
                         transport = transport,
-                        scope = scope
+                        scope = scope,
+                        clusterKey = clusterKey,
+                        authorKeyPair = authorKeyPair,
+                        enforceSignatures = enforceSignatures
                     ) { peerId, changesApplied ->
                         syncListeners.forEach { it(peerId, changesApplied) }
                     }

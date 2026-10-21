@@ -26,6 +26,9 @@ import io.airdb.core.model.DeltaBatch
 import io.airdb.protocol.packet.AirDbPacket
 import io.airdb.protocol.packet.PacketType
 import io.airdb.transport.AirDbTransport
+import io.airdb.core.model.sign
+import io.airdb.core.model.verifySignature
+import io.airdb.crypto.Ed25519KeyPair
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
@@ -43,6 +46,9 @@ class SyncSession(
     private val vectorClock: VectorClock,
     private val transport: AirDbTransport,
     private val scope: CoroutineScope,
+    val clusterKey: ByteArray? = null,
+    val authorKeyPair: Ed25519KeyPair? = null,
+    val enforceSignatures: Boolean = false,
     private val onSyncCompleted: (peerId: String, changesApplied: Int) -> Unit
 ) {
 
@@ -132,26 +138,34 @@ class SyncSession(
                 scope.launch {
                     val changes = DeltaBatch.deserialize(packet.payload)
                     if (changes.isNotEmpty()) {
-                        // Advance local clock based on highest incoming change HLC
-                        val maxHlcRecord = changes.maxWithOrNull(Comparator.comparing({ it.hlcTimestamp }, HlcComparator))
-                        if (maxHlcRecord != null) {
-                            val parsed = HlcTimestamp.parseOrNull(maxHlcRecord.hlcTimestamp)
-                            if (parsed != null) {
-                                clock.update(parsed)
-                            }
+                        val validChanges = if (enforceSignatures) {
+                            changes.filter { it.verifySignature() }
+                        } else {
+                            changes
                         }
 
-                        // Update local vector clock for each incoming change
-                        for (change in changes) {
-                            val origin = HlcComparator.extractNodeId(change.hlcTimestamp) ?: ""
-                            if (origin.isNotEmpty()) {
-                                vectorClock.update(origin, change.hlcTimestamp)
+                        if (validChanges.isNotEmpty()) {
+                            // Advance local clock based on highest incoming change HLC
+                            val maxHlcRecord = validChanges.maxWithOrNull(Comparator.comparing({ it.hlcTimestamp }, HlcComparator))
+                            if (maxHlcRecord != null) {
+                                val parsed = HlcTimestamp.parseOrNull(maxHlcRecord.hlcTimestamp)
+                                if (parsed != null) {
+                                    clock.update(parsed)
+                                }
                             }
-                        }
 
-                        // Apply to database
-                        adapter.applyChanges(changes)
-                        onSyncCompleted(peerId, changes.size)
+                            // Update local vector clock for each incoming change
+                            for (change in validChanges) {
+                                val origin = HlcComparator.extractNodeId(change.hlcTimestamp) ?: ""
+                                if (origin.isNotEmpty()) {
+                                    vectorClock.update(origin, change.hlcTimestamp)
+                                }
+                            }
+
+                            // Apply to database
+                            adapter.applyChanges(validChanges)
+                            onSyncCompleted(peerId, validChanges.size)
+                        }
                     }
 
                     // Acknowledge receipt
@@ -201,8 +215,16 @@ class SyncSession(
         val missingChanges = adapter.getMissingChanges(peerVectorClock.asMap(), limit = 500)
 
         if (missingChanges.isNotEmpty()) {
-            lastSentBatch = missingChanges
-            val deltaBytes = DeltaBatch.serialize(missingChanges)
+            val signedChanges = if (authorKeyPair != null) {
+                missingChanges.map { change ->
+                    if (!change.isSigned) change.sign(authorKeyPair) else change
+                }
+            } else {
+                missingChanges
+            }
+
+            lastSentBatch = signedChanges
+            val deltaBytes = DeltaBatch.serialize(signedChanges)
             val packet = AirDbPacket(
                 type = PacketType.DELTA_BATCH,
                 senderId = localNodeId,

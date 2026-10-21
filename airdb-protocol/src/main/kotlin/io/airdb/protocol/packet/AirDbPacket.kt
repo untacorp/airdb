@@ -25,6 +25,9 @@ object PacketFlags {
 
     /** Indicates the packet contains a specific 8-byte recipient ID. */
     const val FLAG_HAS_RECIPIENT: Byte = 0x02
+
+    /** Indicates the payload is encrypted using ChaCha20-Poly1305 AEAD. */
+    const val FLAG_ENCRYPTED: Byte = 0x04
 }
 
 /**
@@ -49,6 +52,7 @@ data class AirDbPacket(
 ) {
     val isCompressed: Boolean get() = (flags.toInt() and PacketFlags.FLAG_COMPRESSED.toInt()) != 0
     val hasRecipient: Boolean get() = recipientId != null
+    val isEncrypted: Boolean get() = (flags.toInt() and PacketFlags.FLAG_ENCRYPTED.toInt()) != 0
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

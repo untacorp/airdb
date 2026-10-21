@@ -35,6 +35,7 @@ public enum PacketType: UInt8, Sendable {
 public struct PacketFlags {
     public static let compressed: UInt8 = 0x01
     public static let hasRecipient: UInt8 = 0x02
+    public static let encrypted: UInt8 = 0x04
 }
 
 /// Fixed framing envelope for AirDB packets.
@@ -71,5 +72,9 @@ public struct AirDbPacket: Sendable {
 
     public var hasRecipient: Bool {
         recipientId != nil
+    }
+
+    public var isEncrypted: Bool {
+        (flags & PacketFlags.encrypted) != 0
     }
 }

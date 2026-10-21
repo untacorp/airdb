@@ -37,7 +37,7 @@ public final class AssemblyBuffer: @unchecked Sendable {
     }
 
     /// Ingests an incoming fragment packet. Returns the reassembled AirDbPacket once all chunks arrive.
-    public func ingest(_ fragmentPacket: AirDbPacket) -> AirDbPacket? {
+    public func ingest(_ fragmentPacket: AirDbPacket, clusterKey: Data? = nil) -> AirDbPacket? {
         guard let (header, chunk) = FragmentHeader.decode(fragmentPacket.payload) else {
             return nil
         }
@@ -76,7 +76,7 @@ public final class AssemblyBuffer: @unchecked Sendable {
                     guard let p = part else { return nil }
                     fullData.append(p)
                 }
-                return BinaryCodec.decode(fullData)
+                return BinaryCodec.decode(fullData, clusterKey: clusterKey)
             } else {
                 assemblies[header.fragmentId] = assembly
             }

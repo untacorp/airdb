@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     implementation(project(":airdb-core"))
+    implementation(project(":airdb-crypto"))
     implementation(project(":airdb-adapter-api"))
     implementation(project(":airdb-adapter-sqlite"))
     implementation(project(":airdb-protocol"))

@@ -3,6 +3,7 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":airdb-crypto"))
     implementation(libs.kotlin.stdlib)
     implementation(libs.coroutines.core)
 

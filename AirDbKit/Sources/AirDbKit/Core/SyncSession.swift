@@ -16,7 +16,7 @@
 
 import Foundation
 
-/// State machine managing the 1:1 synchronization session with a single peer.
+/// Per-peer synchronization state machine and reconciliation coordinator actor.
 public actor SyncSession {
 
     public enum State: Sendable {
@@ -36,6 +36,9 @@ public actor SyncSession {
     private let clock: HybridLogicalClock
     private let vectorClock: VectorClock
     private let transport: AirDbTransport
+    public let clusterKey: Data?
+    public let authorKeyPair: Ed25519KeyPair?
+    public let enforceSignatures: Bool
     private let onSyncCompleted: @Sendable (String, Int) -> Void
 
     private var currentState: State = .idle
@@ -52,6 +55,9 @@ public actor SyncSession {
         clock: HybridLogicalClock,
         vectorClock: VectorClock,
         transport: AirDbTransport,
+        clusterKey: Data? = nil,
+        authorKeyPair: Ed25519KeyPair? = nil,
+        enforceSignatures: Bool = false,
         onSyncCompleted: @escaping @Sendable (String, Int) -> Void
     ) {
         self.peerId = peerId
@@ -62,11 +68,10 @@ public actor SyncSession {
         self.clock = clock
         self.vectorClock = vectorClock
         self.transport = transport
+        self.clusterKey = clusterKey
+        self.authorKeyPair = authorKeyPair
+        self.enforceSignatures = enforceSignatures
         self.onSyncCompleted = onSyncCompleted
-    }
-
-    public func state() -> State {
-        return currentState
     }
 
     public func start() async {
@@ -76,7 +81,6 @@ public actor SyncSession {
         await sendHandshake()
     }
 
-    /// Triggered when a new local mutation is committed while peers are connected.
     public func notifyLocalMutation() async {
         if currentState == .synchronized || currentState == .idle {
             await streamDeltasToPeer()
@@ -84,11 +88,10 @@ public actor SyncSession {
     }
 
     private func sendHandshake() async {
-        guard let nameData = localNodeName.data(using: .utf8) else { return }
         let packet = AirDbPacket(
             type: .handshake,
             senderId: localNodeId,
-            payload: nameData
+            payload: Data(localNodeName.utf8)
         )
         _ = await transport.send(packet: packet, targetPeerId: peerId)
     }
@@ -96,14 +99,12 @@ public actor SyncSession {
     public func handlePacket(_ packet: AirDbPacket) async {
         switch packet.type {
         case .handshake:
-            if let nameData = localNodeName.data(using: .utf8) {
-                let ack = AirDbPacket(
-                    type: .handshakeAck,
-                    senderId: localNodeId,
-                    payload: nameData
-                )
-                _ = await transport.send(packet: ack, targetPeerId: peerId)
-            }
+            let ack = AirDbPacket(
+                type: .handshakeAck,
+                senderId: localNodeId,
+                payload: Data(localNodeName.utf8)
+            )
+            _ = await transport.send(packet: ack, targetPeerId: peerId)
             await startReconciliation()
 
         case .handshakeAck:
@@ -129,24 +130,33 @@ public actor SyncSession {
         case .deltaBatch:
             let changes = DeltaBatch.deserialize(packet.payload)
             if !changes.isEmpty {
-                // Advance local clock based on highest incoming change HLC
-                let maxHlcRecord = changes.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })
-                if let maxHlc = maxHlcRecord?.hlcTimestamp, let parsed = HlcTimestamp.parse(maxHlc) {
-                    _ = clock.update(remote: parsed)
+                let validChanges: [ChangeRecord]
+                if enforceSignatures {
+                    validChanges = changes.filter { $0.verifySignature() }
+                } else {
+                    validChanges = changes
                 }
 
-                // Update local vector clock for each incoming change
-                for change in changes {
-                    if let origin = HlcComparator.extractNodeId(from: change.hlcTimestamp) {
-                        vectorClock.update(nodeId: origin, hlcTimestamp: change.hlcTimestamp)
+                if !validChanges.isEmpty {
+                    // Advance local clock based on highest incoming change HLC
+                    let maxHlcRecord = validChanges.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })
+                    if let maxHlc = maxHlcRecord?.hlcTimestamp, let parsed = HlcTimestamp.parse(maxHlc) {
+                        _ = clock.update(remote: parsed)
                     }
-                }
 
-                do {
-                    try await adapter.applyChanges(changes)
-                    onSyncCompleted(peerId, changes.count)
-                } catch {
-                    // Log or handle adapter error
+                    // Update local vector clock for each incoming change
+                    for change in validChanges {
+                        if let origin = HlcComparator.extractNodeId(from: change.hlcTimestamp) {
+                            vectorClock.update(nodeId: origin, hlcTimestamp: change.hlcTimestamp)
+                        }
+                    }
+
+                    do {
+                        try await adapter.applyChanges(validChanges)
+                        onSyncCompleted(peerId, validChanges.count)
+                    } catch {
+                        // Log or handle adapter error
+                    }
                 }
             }
 
@@ -189,8 +199,20 @@ public actor SyncSession {
         let missingChanges = (try? await adapter.getMissingChanges(peerClock: peerVectorClock.asMap(), limit: 500)) ?? []
 
         if !missingChanges.isEmpty {
-            lastSentBatch = missingChanges
-            let deltaBytes = DeltaBatch.serialize(missingChanges)
+            let signedChanges: [ChangeRecord]
+            if let keyPair = authorKeyPair {
+                signedChanges = missingChanges.map { change in
+                    if !change.isSigned {
+                        return (try? change.signed(with: keyPair)) ?? change
+                    }
+                    return change
+                }
+            } else {
+                signedChanges = missingChanges
+            }
+
+            lastSentBatch = signedChanges
+            let deltaBytes = DeltaBatch.serialize(signedChanges)
             let packet = AirDbPacket(
                 type: .deltaBatch,
                 senderId: localNodeId,

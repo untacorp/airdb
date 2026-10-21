@@ -35,9 +35,10 @@ object PacketFragmenter {
      */
     fun fragment(
         packet: AirDbPacket,
+        clusterKey: ByteArray? = null,
         maxChunkSize: Int = DEFAULT_MAX_CHUNK_SIZE
     ): List<AirDbPacket> {
-        val encodedBytes = BinaryCodec.encode(packet)
+        val encodedBytes = BinaryCodec.encode(packet, clusterKey = clusterKey)
         if (encodedBytes.size <= maxChunkSize) {
             return listOf(packet)
         }

@@ -119,4 +119,112 @@ class BinaryCodecTest {
         assertEquals(original.recipientId, assembled.recipientId)
         assertArrayEquals(original.payload, assembled.payload)
     }
+
+    @Test
+    fun testEncryptedPacketEncodeDecodeRoundtrip() {
+        val clusterKey = ByteArray(32) { (it * 3).toByte() }
+        val payload = "Confidential disaster survivor vitals: priority RED".toByteArray(Charsets.UTF_8)
+        val packet = AirDbPacket(
+            type = PacketType.DELTA_BATCH,
+            senderId = 12345L,
+            recipientId = 67890L,
+            payload = payload
+        )
+
+        val encoded = BinaryCodec.encode(packet, clusterKey = clusterKey)
+        val decoded = BinaryCodec.decode(encoded, clusterKey = clusterKey)
+
+        assertNotNull(decoded)
+        assertTrue(decoded!!.isEncrypted)
+        assertEquals(packet.type, decoded.type)
+        assertEquals(packet.senderId, decoded.senderId)
+        assertEquals(packet.recipientId, decoded.recipientId)
+        assertArrayEquals(payload, decoded.payload)
+    }
+
+    @Test
+    fun testEncryptedPacketFailsWithoutKeyOrWithWrongKey() {
+        val clusterKey = ByteArray(32) { 0x42.toByte() }
+        val wrongKey = ByteArray(32) { 0x99.toByte() }
+        val payload = "Top secret medical inventory".toByteArray(Charsets.UTF_8)
+        val packet = AirDbPacket(
+            type = PacketType.DELTA_BATCH,
+            senderId = 100L,
+            payload = payload
+        )
+
+        val encoded = BinaryCodec.encode(packet, clusterKey = clusterKey)
+
+        // Without key must return null
+        assertNull(BinaryCodec.decode(encoded, clusterKey = null))
+
+        // With wrong key must return null (Poly1305 MAC fails)
+        assertNull(BinaryCodec.decode(encoded, clusterKey = wrongKey))
+    }
+
+    @Test
+    fun testEncryptedPacketFailsOnTamperedCiphertext() {
+        val clusterKey = ByteArray(32) { 0x55.toByte() }
+        val payload = "Sensitive search and rescue grid coordinates".toByteArray(Charsets.UTF_8)
+        val packet = AirDbPacket(
+            type = PacketType.DELTA_BATCH,
+            senderId = 888L,
+            payload = payload
+        )
+
+        val encoded = BinaryCodec.encode(packet, clusterKey = clusterKey)
+
+        // Corrupt a byte in the encrypted payload region
+        val tampered = encoded.clone()
+        tampered[tampered.size - 5] = (tampered[tampered.size - 5].toInt() xor 0x01).toByte()
+
+        assertNull(BinaryCodec.decode(tampered, clusterKey = clusterKey))
+    }
+
+    @Test
+    fun testEncryptedPacketFailsOnTamperedAadHeader() {
+        val clusterKey = ByteArray(32) { 0x77.toByte() }
+        val payload = "Authentic field triage order".toByteArray(Charsets.UTF_8)
+        val packet = AirDbPacket(
+            type = PacketType.DELTA_BATCH,
+            senderId = 555L,
+            payload = payload
+        )
+
+        val encoded = BinaryCodec.encode(packet, clusterKey = clusterKey)
+
+        // Tamper with the senderId inside the header (bytes 15..22)
+        val tampered = encoded.clone()
+        tampered[16] = (tampered[16].toInt() xor 0xFF).toByte()
+
+        // Decryption MUST fail because the header was part of Authenticated Additional Data (AAD)
+        assertNull(BinaryCodec.decode(tampered, clusterKey = clusterKey))
+    }
+
+    @Test
+    fun testEncryptedPacketWithCompressionAndFragmentation() {
+        val clusterKey = ByteArray(32) { (it + 1).toByte() }
+        val largeRepetitive = "PATIENT_RECORD_TRIAGE_EMERGENCY_DATA_".repeat(30).toByteArray(Charsets.UTF_8)
+        val packet = AirDbPacket(
+            type = PacketType.DELTA_BATCH,
+            senderId = 999L,
+            payload = largeRepetitive
+        )
+
+        val fragments = PacketFragmenter.fragment(packet, clusterKey = clusterKey, maxChunkSize = 50)
+        assertTrue(fragments.size > 1, "Should be fragmented across multiple packets")
+
+        val assemblyBuffer = AssemblyBuffer()
+        var assembled: AirDbPacket? = null
+
+        for (fragment in fragments) {
+            val res = assemblyBuffer.ingest(fragment, clusterKey = clusterKey)
+            if (res != null) assembled = res
+        }
+
+        assertNotNull(assembled)
+        assertTrue(assembled!!.isEncrypted)
+        assertTrue(assembled.isCompressed)
+        assertArrayEquals(largeRepetitive, assembled.payload)
+    }
 }

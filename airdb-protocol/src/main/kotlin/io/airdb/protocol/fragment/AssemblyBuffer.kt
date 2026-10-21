@@ -43,7 +43,7 @@ class AssemblyBuffer(
      * Ingests an incoming fragment packet. If this fragment completes the packet,
      * returns the reassembled [AirDbPacket]; otherwise returns null.
      */
-    fun ingest(fragmentPacket: AirDbPacket): AirDbPacket? {
+    fun ingest(fragmentPacket: AirDbPacket, clusterKey: ByteArray? = null): AirDbPacket? {
         val decoded = FragmentHeader.decode(fragmentPacket.payload) ?: return null
         val (header, chunk) = decoded
 
@@ -76,7 +76,7 @@ class AssemblyBuffer(
                     }
 
                     val fullData = output.toByteArray()
-                    return BinaryCodec.decode(fullData)
+                    return BinaryCodec.decode(fullData, clusterKey = clusterKey)
                 }
             }
         }
