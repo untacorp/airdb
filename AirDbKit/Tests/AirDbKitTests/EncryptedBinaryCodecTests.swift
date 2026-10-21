@@ -106,7 +106,7 @@ final class EncryptedBinaryCodecTests: XCTestCase {
             payload: payload
         )
 
-        let fragments = PacketFragmenter.fragment(packet, clusterKey: clusterKey, maxChunkSize: 50)
+        let fragments = PacketFragmenter.fragment(packet: packet, clusterKey: clusterKey, maxChunkSize: 50)
         XCTAssertTrue(fragments.count > 1, "Should be fragmented across multiple packets")
 
         let assemblyBuffer = AssemblyBuffer()
