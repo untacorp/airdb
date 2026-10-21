@@ -212,7 +212,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         if entity.payload.isEmpty {
             sqlite3_bind_zeroblob(stmt, 4, 0)
         } else {
-            entity.payload.withUnsafeBytes { rawBuffer in
+            _ = entity.payload.withUnsafeBytes { rawBuffer in
                 sqlite3_bind_blob(stmt, 4, rawBuffer.baseAddress, Int32(entity.payload.count), sqliteTransient)
             }
         }
@@ -295,7 +295,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         if record.payload.isEmpty {
             sqlite3_bind_zeroblob(stmt, 4, 0)
         } else {
-            record.payload.withUnsafeBytes { rawBuffer in
+            _ = record.payload.withUnsafeBytes { rawBuffer in
                 sqlite3_bind_blob(stmt, 4, rawBuffer.baseAddress, Int32(record.payload.count), sqliteTransient)
             }
         }
@@ -307,7 +307,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         }
     }
 
-    public func compact(pruneHlcThreshold: String) throws {
+    public func compact(pruneHlcThreshold: String) async throws {
         guard let db = db else { throw SqliteError.databaseClosed }
 
         // Select soft-deleted tombstones to evaluate against canonical HlcComparator total order
@@ -349,8 +349,12 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                 for item in toDelete {
                     sqlite3_reset(deleteStmt)
                     sqlite3_clear_bindings(deleteStmt)
-                    sqlite3_bind_text(deleteStmt, 1, item.collection, -1, sqliteTransient)
-                    sqlite3_bind_text(deleteStmt, 2, item.id, -1, sqliteTransient)
+                    item.collection.withCString { colStr in
+                        item.id.withCString { idStr in
+                            sqlite3_bind_text(deleteStmt, 1, colStr, -1, sqliteTransient)
+                            sqlite3_bind_text(deleteStmt, 2, idStr, -1, sqliteTransient)
+                        }
+                    }
                     if sqlite3_step(deleteStmt) != SQLITE_DONE {
                         throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
                     }
@@ -447,7 +451,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                 if change.payload.isEmpty {
                     sqlite3_bind_zeroblob(upsertStmt, 4, 0)
                 } else {
-                    change.payload.withUnsafeBytes { rawBuffer in
+                    _ = change.payload.withUnsafeBytes { rawBuffer in
                         sqlite3_bind_blob(upsertStmt, 4, rawBuffer.baseAddress, Int32(change.payload.count), sqliteTransient)
                     }
                 }
@@ -467,7 +471,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                 if change.payload.isEmpty {
                     sqlite3_bind_zeroblob(changelogStmt, 4, 0)
                 } else {
-                    change.payload.withUnsafeBytes { rawBuffer in
+                    _ = change.payload.withUnsafeBytes { rawBuffer in
                         sqlite3_bind_blob(changelogStmt, 4, rawBuffer.baseAddress, Int32(change.payload.count), sqliteTransient)
                     }
                 }

@@ -107,9 +107,7 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
         try await adapter.applyChanges([record])
 
         // Immediately trigger real-time delta streaming on active sessions
-        lock.lock()
-        let activeSessions = Array(sessions.values)
-        lock.unlock()
+        let activeSessions = lock.withScopedLock { Array(sessions.values) }
 
         for session in activeSessions {
             Task {
@@ -122,9 +120,9 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
 
     /// Registers a callback listener invoked whenever changes are applied from a peer.
     public func addSyncListener(_ listener: @escaping @Sendable (String, Int) -> Void) {
-        lock.lock()
-        syncListeners.append(listener)
-        lock.unlock()
+        lock.withScopedLock {
+            syncListeners.append(listener)
+        }
     }
 
     // MARK: - TransportListener
@@ -143,31 +141,30 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
                 transport: transport
             ) { [weak self] pId, changeCount in
                 guard let self = self else { return }
-                self.lock.lock()
-                let listeners = self.syncListeners
-                self.lock.unlock()
+                let listeners = self.lock.withScopedLock { self.syncListeners }
                 for listener in listeners {
                     listener(pId, changeCount)
                 }
             }
 
-            lock.lock()
-            sessions[peerId] = session
-            lock.unlock()
+            lock.withScopedLock {
+                sessions[peerId] = session
+            }
 
             Task {
                 await session.start()
             }
 
         case .linkDisconnected(let peerId, _):
-            lock.lock()
-            sessions.removeValue(forKey: peerId)
-            lock.unlock()
+            lock.withScopedLock {
+                sessions.removeValue(forKey: peerId)
+            }
 
         case .packetReceived(let packet, let peerId, let linkId):
-            lock.lock()
-            var session = sessions[peerId]
-            if session == nil {
+            let session = lock.withScopedLock { () -> SyncSession in
+                if let s = sessions[peerId] {
+                    return s
+                }
                 let s = SyncSession(
                     peerId: peerId,
                     linkId: linkId,
@@ -179,22 +176,17 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
                     transport: transport
                 ) { [weak self] pId, changeCount in
                     guard let self = self else { return }
-                    self.lock.lock()
-                    let listeners = self.syncListeners
-                    self.lock.unlock()
+                    let listeners = self.lock.withScopedLock { self.syncListeners }
                     for listener in listeners {
                         listener(pId, changeCount)
                     }
                 }
                 sessions[peerId] = s
-                session = s
+                return s
             }
-            lock.unlock()
 
-            if let session = session {
-                Task {
-                    await session.handlePacket(packet)
-                }
+            Task {
+                await session.handlePacket(packet)
             }
 
         default:

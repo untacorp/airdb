@@ -15,11 +15,11 @@
  */
 
 #if canImport(CoreBluetooth)
-import CoreBluetooth
+@preconcurrency import CoreBluetooth
 import Foundation
 
 /// Configuration parameters for the AirDB Bluetooth Low Energy transport layer.
-public struct BleConfig: Sendable {
+public struct BleConfig: @unchecked Sendable {
     public let serviceUuid: CBUUID
     public let characteristicUuid: CBUUID
     public let cccdUuid: CBUUID

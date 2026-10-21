@@ -87,23 +87,21 @@ public final class SimulatedTransport: AirDbTransport, @unchecked Sendable {
     }
 
     public func start() {
-        lock.lock()
-        isRunning = true
-        lock.unlock()
+        lock.withScopedLock {
+            isRunning = true
+        }
         network.register(nodeId: nodeId, transport: self)
     }
 
     public func stop() {
-        lock.lock()
-        isRunning = false
-        lock.unlock()
+        lock.withScopedLock {
+            isRunning = false
+        }
         network.unregister(nodeId: nodeId)
     }
 
     public func send(packet: AirDbPacket, targetPeerId: String?) async -> Bool {
-        lock.lock()
-        let running = isRunning
-        lock.unlock()
+        let running = lock.withScopedLock { isRunning }
         guard running else { return false }
 
         let fragments = PacketFragmenter.fragment(packet: packet, maxChunkSize: maxChunkSize)
@@ -114,16 +112,15 @@ public final class SimulatedTransport: AirDbTransport, @unchecked Sendable {
     }
 
     public func setListener(_ listener: TransportListener) {
-        lock.lock()
-        self.listener = listener
-        lock.unlock()
+        lock.withScopedLock {
+            self.listener = listener
+        }
     }
 
     internal func deliver(senderNodeId: String, rawPacket: AirDbPacket) {
-        lock.lock()
-        let currentListener = self.listener
-        let running = self.isRunning
-        lock.unlock()
+        let (currentListener, running) = lock.withScopedLock {
+            (self.listener, self.isRunning)
+        }
 
         guard running, let listener = currentListener else { return }
 
@@ -147,10 +144,9 @@ public final class SimulatedTransport: AirDbTransport, @unchecked Sendable {
     }
 
     internal func notifyPeerConnected(peerId: String) {
-        lock.lock()
-        let currentListener = self.listener
-        let running = self.isRunning
-        lock.unlock()
+        let (currentListener, running) = lock.withScopedLock {
+            (self.listener, self.isRunning)
+        }
 
         guard running, let listener = currentListener else { return }
         listener.onTransportEvent(.peerDiscovered(peerId: peerId, rssi: -45))
@@ -158,10 +154,9 @@ public final class SimulatedTransport: AirDbTransport, @unchecked Sendable {
     }
 
     internal func notifyPeerDisconnected(peerId: String) {
-        lock.lock()
-        let currentListener = self.listener
-        let running = self.isRunning
-        lock.unlock()
+        let (currentListener, running) = lock.withScopedLock {
+            (self.listener, self.isRunning)
+        }
 
         guard running, let listener = currentListener else { return }
         listener.onTransportEvent(.linkDisconnected(peerId: peerId, linkId: "sim-link-\(peerId)"))

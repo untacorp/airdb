@@ -67,8 +67,6 @@ public extension AdaptiveStorageContract {
     func executeInTransaction<T: Sendable>(_ block: @Sendable () async throws -> T) async throws -> T {
         try await block()
     }
-
-    func compact(pruneHlcThreshold: String) async throws {}
 }
 
 /// Universal actor implementing `AirDbAdapter` over any `AdaptiveStorageContract`.

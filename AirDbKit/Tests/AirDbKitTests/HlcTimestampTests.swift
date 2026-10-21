@@ -17,6 +17,13 @@
 import XCTest
 @testable import AirDbKit
 
+private final class MockTimeSource: @unchecked Sendable {
+    var currentTime: Int64
+    init(_ initial: Int64) {
+        self.currentTime = initial
+    }
+}
+
 final class HlcTimestampTests: XCTestCase {
 
     func testHlcTimestampOrdering() {
@@ -45,8 +52,8 @@ final class HlcTimestampTests: XCTestCase {
     }
 
     func testHlcClockAdvanceOnLocalEvent() {
-        var simulatedTime: Int64 = 1000
-        let clock = HybridLogicalClock(nodeId: "node-1") { simulatedTime }
+        let timeSource = MockTimeSource(1000)
+        let clock = HybridLogicalClock(nodeId: "node-1") { timeSource.currentTime }
 
         let t1 = clock.now()
         XCTAssertEqual(t1.physicalTime, 1000)
@@ -58,15 +65,15 @@ final class HlcTimestampTests: XCTestCase {
         XCTAssertEqual(t2.logicalCounter, 1)
 
         // Clock moves forward
-        simulatedTime = 1005
+        timeSource.currentTime = 1005
         let t3 = clock.now()
         XCTAssertEqual(t3.physicalTime, 1005)
         XCTAssertEqual(t3.logicalCounter, 0)
     }
 
     func testHlcClockAdvanceOnRemoteMessage() {
-        var simulatedTime: Int64 = 1000
-        let clock = HybridLogicalClock(nodeId: "node-1") { simulatedTime }
+        let timeSource = MockTimeSource(1000)
+        let clock = HybridLogicalClock(nodeId: "node-1") { timeSource.currentTime }
 
         // Remote message from future clock
         let remoteTs = HlcTimestamp(physicalTime: 1200, logicalCounter: 5, nodeId: "node-2")
@@ -76,7 +83,7 @@ final class HlcTimestampTests: XCTestCase {
         XCTAssertEqual(updated.logicalCounter, 6)
 
         // Local clock ticks after remote update
-        simulatedTime = 1100 // wall clock still behind remote
+        timeSource.currentTime = 1100 // wall clock still behind remote
         let tLocal = clock.now()
         XCTAssertEqual(tLocal.physicalTime, 1200)
         XCTAssertEqual(tLocal.logicalCounter, 7)

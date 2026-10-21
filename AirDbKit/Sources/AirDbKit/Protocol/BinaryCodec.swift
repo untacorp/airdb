@@ -151,8 +151,8 @@ public enum BinaryCodec {
     public static func decompress(_ source: Data) -> Data? {
         guard !source.isEmpty else { return source }
         // Allocate generous expansion buffer (4x or 64KB minimum)
-        var destinationCapacity = max(source.count * 4, 65536)
-        var destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: destinationCapacity)
+        let destinationCapacity = max(source.count * 4, 65536)
+        let destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: destinationCapacity)
         defer { destinationBuffer.deallocate() }
 
         let decompressedSize = source.withUnsafeBytes { (sourceBuffer: UnsafeRawBufferPointer) -> Int in

@@ -27,31 +27,33 @@ private final class MockAdaptiveStorage: AdaptiveStorageContract, @unchecked Sen
     }
 
     func readEntity(collection: String, id: String) async throws -> StoredEntity? {
-        lock.lock()
-        defer { lock.unlock() }
-        return entities[key(collection, id)]
+        lock.withScopedLock {
+            entities[key(collection, id)]
+        }
     }
 
     func writeEntity(_ entity: StoredEntity) async throws {
-        lock.lock()
-        defer { lock.unlock() }
-        entities[key(entity.collection, entity.id)] = entity
+        lock.withScopedLock {
+            entities[key(entity.collection, entity.id)] = entity
+        }
     }
 
     func readChangelogSince(sinceHlcTimestamp: String?, limit: Int) async throws -> [ChangeRecord] {
-        lock.lock()
-        defer { lock.unlock() }
-        if let since = sinceHlcTimestamp {
-            return changelog.filter { HlcComparator.compare($0.hlcTimestamp, since) == .orderedDescending }.prefix(limit).map { $0 }
+        lock.withScopedLock {
+            if let since = sinceHlcTimestamp {
+                return changelog.filter { HlcComparator.compare($0.hlcTimestamp, since) == .orderedDescending }.prefix(limit).map { $0 }
+            }
+            return Array(changelog.prefix(limit))
         }
-        return Array(changelog.prefix(limit))
     }
 
     func appendChangelog(_ record: ChangeRecord) async throws {
-        lock.lock()
-        defer { lock.unlock() }
-        changelog.append(record)
+        lock.withScopedLock {
+            changelog.append(record)
+        }
     }
+
+    func compact(pruneHlcThreshold: String) async throws {}
 }
 
 final class AdaptiveAirDbAdapterTests: XCTestCase {
