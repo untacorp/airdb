@@ -241,6 +241,19 @@ To run the interactive off-grid disaster response sync simulation:
 
 ---
 
+## Acknowledgements & Prior Art
+
+AirDB's protocols, architecture, and design decisions were informed and inspired by foundational research and open-source projects across distributed systems, cryptography, and wireless mesh networks:
+
+- **BitChat**: For demonstrating the feasibility of ad-hoc mobile Bluetooth Low Energy (BLE) mesh communication, dual-role GATT operation, and opportunistic store-and-forward relay mechanics in off-grid environments. AirDB is a clean-room implementation engineered specifically for structured database replication and causal consistency (CRDT/HLC), rather than ephemeral messaging.
+- **Hybrid Logical Clocks (HLC)**: Based on the research paper *"Logical Physical Clocks and Consistent Snapshots in Globally Distributed Databases"* by Sandeep Kulkarni, Murat Demirbas, David Madeppa, Bharath Balasubramanian, and Sugumar Radhakrishnan (2014).
+- **Vector Clocks & Distributed Ordering**: Grounded in the foundational research of Leslie Lamport (1978), Colin Fidge (1988), and Friedemann Mattern (1988) on causal event ordering, partial order lattices, and state reconciliation.
+- **The Local-First Software Movement**: Inspired by the manifesto *"Local-First Software: You Own Your Data, in spite of the Cloud"* by Martin Kleppmann, Adam Wiggins, Peter van Hardenberg, and Mark McGranaghan (Ink & Switch, 2019).
+- **SQLite Engine**: Informed by D. Richard Hipp's architectural principles of crash resilience, Write-Ahead Logging (WAL), and zero-dependency embedded persistence.
+- **RFC Cryptographic Standards**: RFC 8439 (ChaCha20-Poly1305 AEAD), RFC 8032 (Ed25519 Digital Signatures), and RFC 5869 (HKDF-SHA256).
+
+---
+
 ## License
 
 AirDB is licensed under the **Apache License, Version 2.0**. See the [LICENSE](LICENSE) file for details.

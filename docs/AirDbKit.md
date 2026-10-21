@@ -220,6 +220,17 @@ swift test
 
 ---
 
+## Acknowledgements & Prior Art
+
+AirDbKit's design and protocols were inspired by:
+- **BitChat**: For pioneering practical mobile ad-hoc BLE mesh networking and store-and-forward relay mechanics across Apple and Android ecosystems. AirDbKit is a clean-room implementation built for causal database replication.
+- **Hybrid Logical Clocks**: Research by Kulkarni et al. (2014) on monotonic physical-logical clock ordering.
+- **Vector Clocks**: Foundational distributed systems research by Lamport (1978), Fidge (1988), and Mattern (1988).
+- **Local-First Computing**: The Local-First Software Manifesto by Kleppmann et al. (Ink & Switch, 2019).
+- **Apple Cryptography & Persistence**: Apple CryptoKit (RFC 8439 / RFC 8032) and native `libsqlite3` architecture.
+
+---
+
 ## License
 
 Copyright 2026 AirDB Authors. Licensed under the Apache License, Version 2.0.
