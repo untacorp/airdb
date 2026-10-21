@@ -1,0 +1,97 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 0.2.0)'
+        required: false
+        default: '0.2.0'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-maven-and-release:
+    name: Publish Maven Central & Create GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build, Sign, and Stage Artifacts
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ""
+        run: |
+          ./gradlew publishAllPublicationsToStagingRepository --no-daemon
+
+      - name: Package Central Bundle
+        run: |
+          cd build/staging-repo
+          zip -r ../bundle.zip io/ -x "*/maven-metadata*"
+          ls -la ../bundle.zip
+
+      - name: Upload to Sonatype Central Portal
+        env:
+          SONATYPE_USERNAME: ${{ secrets.CENTRAL_SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_PASSWORD }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            VERSION="${{ inputs.version || '0.2.0' }}"
+          fi
+
+          AUTH_HEADER="Bearer $(printf '%s:%s' "$SONATYPE_USERNAME" "$SONATYPE_PASSWORD" | base64 -w 0)"
+
+          echo "Uploading bundle for version $VERSION to Sonatype Central Portal..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC&name=airdb-${VERSION}" \
+            -H "Authorization: $AUTH_HEADER" \
+            -F "bundle=@build/bundle.zip;type=application/octet-stream")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "Error: Failed to upload to Sonatype Central Portal"
+            exit 1
+          fi
+          echo "Deployment initiated successfully on Sonatype Central Portal. Deployment ID: $BODY"
+
+      - name: Create GitHub Release (Apple SPM & Maven Distribution)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            TAG_NAME="v${{ inputs.version || '0.2.0' }}"
+          fi
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Release $TAG_NAME already exists, attaching bundle..."
+            gh release upload "$TAG_NAME" build/bundle.zip#airdb-maven-bundle.zip --clobber
+          else
+            echo "Creating GitHub Release $TAG_NAME..."
+            gh release create "$TAG_NAME" \
+              --title "$TAG_NAME: AirDB Decentralized Replication Engine" \
+              --generate-notes \
+              build/bundle.zip#airdb-maven-bundle.zip
+          fi
