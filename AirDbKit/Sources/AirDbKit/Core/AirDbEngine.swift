@@ -98,7 +98,7 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
         payload: Data
     ) async throws -> ChangeRecord {
         let hlc = clock.now().description
-        vectorClock.update(nodeId: nodeName, timestamp: hlc)
+        vectorClock.update(nodeId: nodeName, hlcTimestamp: hlc)
 
         var record = ChangeRecord(
             id: id,
@@ -114,10 +114,7 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
 
         try await adapter.applyChanges([record])
 
-        let activeSessions: [SyncSession]
-        lock.lock()
-        activeSessions = Array(sessions.values)
-        lock.unlock()
+        let activeSessions = lock.withScopedLock { Array(sessions.values) }
 
         for session in activeSessions {
             await session.notifyLocalMutation()
@@ -225,8 +222,8 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
                 await session.handlePacket(packet)
             }
 
-        case .peerDiscovered(let peerId, _):
-            transport.connect(peerId: peerId)
+        default:
+            break
         }
     }
 }
