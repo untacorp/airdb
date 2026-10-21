@@ -24,7 +24,7 @@ cd airdb
 ./gradlew publishToMavenLocal
 ```
 
-This installs artifacts to your local cache at `~/.m2/repository/io/airdb/`.
+This installs artifacts to your local cache at `~/.m2/repository/io/github/untacorp/`.
 
 ---
 

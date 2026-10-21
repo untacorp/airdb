@@ -13,22 +13,22 @@ Add the AirDB modules to your application module's `build.gradle.kts`:
 ```kotlin
 dependencies {
     // Core causality engine and synchronization state machine
-    implementation("io.airdb:airdb-core:0.2.0")
+    implementation("io.github.untacorp:airdb-core:0.2.0")
     
     // Wire protocol codecs, compression, and MTU fragmenter
-    implementation("io.airdb:airdb-protocol:0.2.0")
+    implementation("io.github.untacorp:airdb-protocol:0.2.0")
     
     // ChaCha20-Poly1305 AEAD, Ed25519 signatures, and HKDF
-    implementation("io.airdb:airdb-crypto:0.2.0")
+    implementation("io.github.untacorp:airdb-crypto:0.2.0")
     
     // Turnkey SQLite storage engine with WAL mode
-    implementation("io.airdb:airdb-adapter-sqlite:0.2.0")
+    implementation("io.github.untacorp:airdb-adapter-sqlite:0.2.0")
     
     // Production Android Bluetooth Low Energy transport driver
-    implementation("io.airdb:airdb-transport-ble:0.2.0")
+    implementation("io.github.untacorp:airdb-transport-ble:0.2.0")
     
     // (Optional) In-memory transport simulator for automated unit tests
-    testImplementation("io.airdb:airdb-transport-sim:0.2.0")
+    testImplementation("io.github.untacorp:airdb-transport-sim:0.2.0")
 }
 ```
 

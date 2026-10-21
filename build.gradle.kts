@@ -8,7 +8,7 @@ subprojects {
         apply(plugin = "maven-publish")
         apply(plugin = "java")
 
-        group = "io.airdb"
+        group = "io.github.untacorp"
         version = "0.2.0"
 
         configure<JavaPluginExtension> {
