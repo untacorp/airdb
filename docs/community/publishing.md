@@ -6,15 +6,15 @@ This guide outlines the pipeline for publishing AirDB artifacts to Maven Central
 
 ## 1. JVM & Android Publishing (Maven Central)
 
-AirDB publishes 8 JVM modules to Sonatype Maven Central:
-- `:airdb-adapter-api`
-- `:airdb-adapter-sqlite`
-- `:airdb-core`
-- `:airdb-crypto`
-- `:airdb-protocol`
-- `:airdb-transport-api`
-- `:airdb-transport-ble`
-- `:airdb-transport-sim`
+AirDB publishes 8 JVM modules to Sonatype Maven Central under namespace `io.github.untacorp`:
+- `io.github.untacorp:airdb-adapter-api`
+- `io.github.untacorp:airdb-adapter-sqlite`
+- `io.github.untacorp:airdb-core`
+- `io.github.untacorp:airdb-crypto`
+- `io.github.untacorp:airdb-protocol`
+- `io.github.untacorp:airdb-transport-api`
+- `io.github.untacorp:airdb-transport-ble`
+- `io.github.untacorp:airdb-transport-sim`
 
 ### Local Verification (`publishToMavenLocal`)
 To verify POM generation, sources JARs, and javadoc JARs locally without publishing to remote repositories:
