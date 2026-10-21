@@ -18,7 +18,7 @@ AirDB takes security and data privacy seriously, especially because the engine i
 If you discover a security vulnerability in AirDB:
 
 1. **Do not create a public GitHub Issue.**
-2. Send an email to the security response team at `security@untacorp.com`.
+2. Report the vulnerability privately via **[GitHub Private Vulnerability Reporting](https://github.com/untacorp/airdb/security/advisories/new)**.
 3. Include:
    - A description of the vulnerability.
    - Steps to reproduce or proof-of-concept code.

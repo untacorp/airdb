@@ -52,9 +52,9 @@ In an off-grid BLE mesh network, communication occurs across an open RF broadcas
 
 ## 4. Reporting a Vulnerability
 
-If you discover a security vulnerability within AirDB, please do not open a public GitHub issue. Send a responsible disclosure report to the maintainers at:
+If you discover a security vulnerability within AirDB, please do not open a public GitHub issue. 
 
-`security@airdb.dev` (or via private GitHub Security Advisory).
+Please report it privately via **[GitHub Private Vulnerability Reporting](https://github.com/untacorp/airdb/security/advisories/new)**. This ensures your report is received privately and securely by the maintainers without exposing private personal email addresses.
 
 Please include:
 1. Module and platform affected (JVM, Android, or Apple AirDbKit).
