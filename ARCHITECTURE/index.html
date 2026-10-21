@@ -1,0 +1,2411 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Decentralized, Local-First P2P Database Synchronization Engine over Bluetooth Low Energy">
+      
+      
+        <meta name="author" content="AirDB Authors">
+      
+      
+        <link rel="canonical" href="https://untacorp.github.io/airdb/ARCHITECTURE/">
+      
+      
+        <link rel="prev" href="../AirDbKit/">
+      
+      
+        <link rel="next" href="../PROTOCOL_SPEC/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Engine & Causality - AirDB</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#airdb-architecture-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="AirDB" class="md-header__button md-logo" aria-label="AirDB" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            AirDB
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Engine & Causality
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/untacorp/airdb" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    untacorp/airdb
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../cookbooks/room-android/" class="md-tabs__link">
+          
+  
+  
+  BYOD Cookbooks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../adr/0001-sans-io-architecture/" class="md-tabs__link">
+          
+  
+  
+  Architecture Decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../SECURITY/" class="md-tabs__link">
+          
+  
+  
+  Security & FAQ
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../PUBLISHING/" class="md-tabs__link">
+          
+  
+  
+  Reference & Publishing
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="AirDB" class="md-nav__button md-logo" aria-label="AirDB" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    AirDB
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/untacorp/airdb" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    untacorp/airdb
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AirDbKit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apple Platforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine & Causality
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine & Causality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-sans-io-architectural-discipline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Sans-I/O Architectural Discipline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-concurrency-threading-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Concurrency &amp; Threading Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Concurrency &amp; Threading Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-android-single-flight-gatt-invariant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Android Single-Flight GATT Invariant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#swift-actor-model-on-apple-platforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Swift Actor Model on Apple Platforms
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-distributed-causality-formal-mathematics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Distributed Causality &amp; Formal Mathematics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Distributed Causality &amp; Formal Mathematics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hybrid-logical-clocks-hlc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hybrid Logical Clocks (HLC)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#total-order-relation-_hlc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Total Order Relation (\(&lt;_{HLC}\))
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monotonic-causality-progression-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monotonic Causality Progression Rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monotonic Causality Progression Rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rule-1-local-mutation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule 1: Local Mutation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rule-2-remote-message-ingestion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule 2: Remote Message Ingestion
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-vector-clock-state-tracking-delta-reconciliation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Vector Clock State Tracking &amp; Delta Reconciliation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Vector Clock State Tracking &amp; Delta Reconciliation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#formal-definition-of-vector-clock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formal Definition of Vector Clock
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#causal-dominance-partial-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Causal Dominance &amp; Partial Order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exact-delta-reconciliation-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact Delta Reconciliation Set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conflict-resolution-last-write-wins-lww" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conflict Resolution: Last-Write-Wins (LWW)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convergence-theorem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convergence Theorem
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-durable-sqlite-persistence-seam" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Durable SQLite Persistence Seam
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Durable SQLite Persistence Seam">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schema-architecture-change-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Architecture &amp; Change Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#durability-acid-guarantees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durability &amp; ACID Guarantees
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-zero-trust-cryptographic-mesh-provenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Zero-Trust Cryptographic Mesh &amp; Provenance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Zero-Trust Cryptographic Mesh &amp; Provenance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layer-1-cluster-level-symmetric-aead-chacha20-poly1305" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 1: Cluster-Level Symmetric AEAD (ChaCha20-Poly1305)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-2-record-level-asymmetric-signatures-ed25519" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 2: Record-Level Asymmetric Signatures (Ed25519)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Layer 2: Record-Level Asymmetric Signatures (Ed25519)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#canonical-signing-tuple" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canonical Signing Tuple
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signature-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signature Generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-trust-verification-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Zero-Trust Verification Rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PROTOCOL_SPEC/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wire Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CODING_STANDARDS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coding Standards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BYOD Cookbooks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    BYOD Cookbooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cookbooks/room-android/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android Room
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cookbooks/sqldelight/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQLDelight Multiplatform
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cookbooks/sqlite-android/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Android SQLite WAL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cookbooks/grdb-ios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apple GRDB.swift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cookbooks/swiftdata-ios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apple SwiftData
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cookbooks/coredata-ios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apple CoreData
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cookbooks/sqlite-apple/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apple Native SQLite
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cookbooks/in-memory-kv/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    In-Memory KV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture Decisions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture Decisions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-sans-io-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0001 Sans-I/O Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-hlc-conflict-resolution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0002 HLC Conflict Resolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-single-flight-gatt-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0003 Single-Flight GATT Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-sqlite-persistence-seam/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0004 Durable SQLite Persistence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0005-zero-trust-cryptographic-mesh/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0005 Zero-Trust Cryptographic Mesh
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security & FAQ
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security & FAQ
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SECURITY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../FAQ/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frequently Asked Questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference & Publishing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference & Publishing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PUBLISHING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Publishing Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-sans-io-architectural-discipline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Sans-I/O Architectural Discipline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-concurrency-threading-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Concurrency &amp; Threading Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Concurrency &amp; Threading Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-android-single-flight-gatt-invariant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Android Single-Flight GATT Invariant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#swift-actor-model-on-apple-platforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Swift Actor Model on Apple Platforms
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-distributed-causality-formal-mathematics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Distributed Causality &amp; Formal Mathematics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Distributed Causality &amp; Formal Mathematics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hybrid-logical-clocks-hlc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hybrid Logical Clocks (HLC)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#total-order-relation-_hlc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Total Order Relation (\(&lt;_{HLC}\))
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monotonic-causality-progression-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monotonic Causality Progression Rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monotonic Causality Progression Rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rule-1-local-mutation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule 1: Local Mutation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rule-2-remote-message-ingestion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule 2: Remote Message Ingestion
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-vector-clock-state-tracking-delta-reconciliation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Vector Clock State Tracking &amp; Delta Reconciliation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Vector Clock State Tracking &amp; Delta Reconciliation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#formal-definition-of-vector-clock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formal Definition of Vector Clock
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#causal-dominance-partial-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Causal Dominance &amp; Partial Order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exact-delta-reconciliation-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact Delta Reconciliation Set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conflict-resolution-last-write-wins-lww" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conflict Resolution: Last-Write-Wins (LWW)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#convergence-theorem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convergence Theorem
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-durable-sqlite-persistence-seam" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Durable SQLite Persistence Seam
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Durable SQLite Persistence Seam">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schema-architecture-change-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Architecture &amp; Change Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#durability-acid-guarantees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Durability &amp; ACID Guarantees
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-zero-trust-cryptographic-mesh-provenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Zero-Trust Cryptographic Mesh &amp; Provenance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Zero-Trust Cryptographic Mesh &amp; Provenance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layer-1-cluster-level-symmetric-aead-chacha20-poly1305" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 1: Cluster-Level Symmetric AEAD (ChaCha20-Poly1305)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-2-record-level-asymmetric-signatures-ed25519" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 2: Record-Level Asymmetric Signatures (Ed25519)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Layer 2: Record-Level Asymmetric Signatures (Ed25519)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#canonical-signing-tuple" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canonical Signing Tuple
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signature-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signature Generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-trust-verification-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Zero-Trust Verification Rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="airdb-architecture-guide">AirDB Architecture Guide</h1>
+<p>This document details the architectural principles, threading model, causal mathematics, persistence seam, and zero-trust cryptographic mesh that make AirDB robust in low-bandwidth, partition-heavy Bluetooth Low Energy (BLE) environments.</p>
+<hr />
+<h2 id="1-sans-io-architectural-discipline">1. Sans-I/O Architectural Discipline</h2>
+<p>A recurring failure mode in peer-to-peer mobile libraries is tightly coupling networking sockets or Bluetooth hardware delegates directly with state logic. This leads to queue-order deadlocks, difficult-to-reproduce race conditions, and tests that depend on physical wall-clock timeouts.</p>
+<p>AirDB adopts a strict <strong>Sans-I/O</strong> architecture:
+* <strong>Protocol &amp; Core logic are pure state transformations</strong>: They take an inbound event or byte array, compute transitions, and return outbound effects or state updates.
+* <strong>Platform boundary</strong>: Bluetooth managers, Android GATT callbacks, and hardware timers exist exclusively in <code>airdb-transport-ble</code> and <code>CoreBluetoothTransport</code>.
+* <strong>Instant simulation</strong>: Because the core engine communicates via <code>AirDbTransport</code> interfaces, <code>SimulatedTransport</code> allows testing complex multi-node network topologies (with simulated packet drops, reordering, and partitions) completely in memory in milliseconds.</p>
+<hr />
+<h2 id="2-concurrency-threading-model">2. Concurrency &amp; Threading Model</h2>
+<h3 id="the-android-single-flight-gatt-invariant">The Android Single-Flight GATT Invariant</h3>
+<p>The native Android Bluetooth stack (BlueDroid/Fluoride) is asynchronous and single-flight per connection. If an application invokes <code>writeCharacteristic</code> or <code>notifyCharacteristicChanged</code> while an existing operation is pending, the Android stack either rejects the call immediately or drops the packet silently.</p>
+<p>AirDB solves this with <code>GattOperationQueue</code>:
+* <strong>State per link</strong>: Every active physical link has an isolated FIFO operation queue with an <code>inFlight</code> boolean flag.
+* <strong>Trigger on callback</strong>: The next operation in queue is dispatched ONLY when the driver invokes <code>onCharacteristicWrite</code> (Central) or <code>onNotificationSent</code> (Server).
+* <strong>Backpressure bounds</strong>: Queues enforce a strict capacity limit (default 256 operations or 1 MiB) with exponential backoff on transient stack errors.</p>
+<h3 id="swift-actor-model-on-apple-platforms">Swift Actor Model on Apple Platforms</h3>
+<p>On Apple platforms, <code>AirDbKit</code> implements the core engine as a Swift <code>actor</code>:
+* <strong>Data Race Freedom</strong>: Compile-time enforcement of isolated mutable state across threads.
+* <strong>Non-Blocking Delegates</strong>: Asynchronous CoreBluetooth delegate callbacks forward frames into structured Swift tasks without blocking radio threads.
+* <strong>Zero Third-Party Dependencies</strong>: Relies 100% on Apple standard frameworks (<code>CryptoKit</code>, <code>Compression</code>, <code>CoreBluetooth</code>, and native <code>libsqlite3</code>).</p>
+<hr />
+<h2 id="3-distributed-causality-formal-mathematics">3. Distributed Causality &amp; Formal Mathematics</h2>
+<h3 id="hybrid-logical-clocks-hlc">Hybrid Logical Clocks (HLC)</h3>
+<p>In off-grid disaster environments or mobile POS setups, physical system clocks can drift by minutes or hours due to lack of network time synchronization (NTP).</p>
+<p>AirDB uses <strong>Hybrid Logical Clocks (HLC)</strong> combining physical time, an incrementing counter, and a node tie-breaker:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>T = (pt, lc, nodeId)
+</span></code></pre></div>
+<p>Where:
+* <span class="arithmatex">\(pt \in \mathbb{N}_0\)</span>: Physical time (epoch milliseconds).
+* <span class="arithmatex">\(lc \in \mathbb{N}_0\)</span>: Monotonic logical counter for events sharing the same physical millisecond.
+* <span class="arithmatex">\(nodeId \in \Sigma^+\)</span>: Globally unique node identifier ensuring total ordering.</p>
+<h3 id="total-order-relation-_hlc">Total Order Relation (<span class="arithmatex">\(&lt;_{HLC}\)</span>)</h3>
+<p>For any two timestamps <span class="arithmatex">\(T_1 = (pt_1, lc_1, node_1)\)</span> and <span class="arithmatex">\(T_2 = (pt_2, lc_2, node_2)\)</span>, the strict total order <span class="arithmatex">\(&lt;_{HLC}\)</span> is defined lexicographically:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>T_1 &lt;_{HLC} T_2 \iff \begin{cases}
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pt_1 &lt; pt_2 \\
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>pt_1 = pt_2 \land lc_1 &lt; lc_2 \\
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>pt_1 = pt_2 \land lc_1 = lc_2 \land node_1 &lt;_{lex} node_2
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>\end{cases}
+</span></code></pre></div>
+<p>This relation forms a strict total order: irreflexive, asymmetric, transitive, and connex. Every pair of timestamps is deterministically comparable across all distributed replicas.</p>
+<h3 id="monotonic-causality-progression-rules">Monotonic Causality Progression Rules</h3>
+<h4 id="rule-1-local-mutation">Rule 1: Local Mutation</h4>
+<p>When generating a new timestamp on node <span class="arithmatex">\(j\)</span>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pt' = \max(latest.pt, \text{now}())
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>lc' = \begin{cases}
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>latest.lc + 1 &amp; \text{if } pt' = latest.pt \\
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>0 &amp; \text{otherwise}
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>\end{cases}
+</span></code></pre></div>
+<h4 id="rule-2-remote-message-ingestion">Rule 2: Remote Message Ingestion</h4>
+<p>When node <span class="arithmatex">\(j\)</span> observes remote timestamp <span class="arithmatex">\(T_{remote} = (pt_{rem}, lc_{rem}, node_{rem})\)</span>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pt' = \max(\max(latest.pt, pt_{rem}), \text{now}())
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>lc' = \begin{cases}
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>\max(latest.lc, lc_{rem}) + 1 &amp; \text{if } pt' = latest.pt = pt_{rem} \\
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>latest.lc + 1 &amp; \text{if } pt' = latest.pt \\
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>lc_{rem} + 1 &amp; \text{if } pt' = pt_{rem} \\
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>0 &amp; \text{otherwise}
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>\end{cases}
+</span></code></pre></div>
+<hr />
+<h2 id="4-vector-clock-state-tracking-delta-reconciliation">4. Vector Clock State Tracking &amp; Delta Reconciliation</h2>
+<h3 id="formal-definition-of-vector-clock">Formal Definition of Vector Clock</h3>
+<p>A Vector Clock <span class="arithmatex">\(V\)</span> on a node is a partial function mapping originating node identifiers to their highest known causal HLC timestamp:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>V : \text{NodeId} \to \text{HLC}
+</span></code></pre></div>
+<h3 id="causal-dominance-partial-order">Causal Dominance &amp; Partial Order</h3>
+<p>Given two vector clocks <span class="arithmatex">\(V_A\)</span> and <span class="arithmatex">\(V_B\)</span>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>V_A \le V_B \iff \forall k \in \text{dom}(V_A): V_A[k] \le_{HLC} V_B[k]
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>V_A &lt; V_B \iff (V_A \le V_B) \land (V_A \ne V_B)
+</span></code></pre></div>
+<p>If neither <span class="arithmatex">\(V_A \le V_B\)</span> nor <span class="arithmatex">\(V_B \le V_A\)</span>, the states are causally concurrent:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>V_A \parallel V_B \iff \neg(V_A \le V_B) \land \neg(V_B \le V_A)
+</span></code></pre></div>
+<h3 id="exact-delta-reconciliation-set">Exact Delta Reconciliation Set</h3>
+<p>When node <span class="arithmatex">\(B\)</span> reconciles with node <span class="arithmatex">\(A\)</span> presenting knowledge vector <span class="arithmatex">\(V_A\)</span>, the minimal missing delta batch <span class="arithmatex">\(\Delta(B \to A)\)</span> is computed as:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>\Delta(B \to A) = \left\{ r \in \text{Records}_B \mid r.hlc &gt;_{HLC} V_A[r.nodeId] \right\}
+</span></code></pre></div>
+<p>Where <span class="arithmatex">\(V_A[r.nodeId] = -\infty\)</span> if <span class="arithmatex">\(r.nodeId \notin \text{dom}(V_A)\)</span>.</p>
+<p>This invariant guarantees that:
+1. Re-connecting nodes transmit only novel mutations created during partition intervals.
+2. Bandwidth consumption over BLE is strictly bounded to missing records <span class="arithmatex">\(\mathcal{O}(|\Delta|)\)</span> rather than total database size <span class="arithmatex">\(\mathcal{O}(|\text{DB}|)\)</span>.</p>
+<h3 id="conflict-resolution-last-write-wins-lww">Conflict Resolution: Last-Write-Wins (LWW)</h3>
+<p>For any record key <span class="arithmatex">\(K\)</span> subject to concurrent mutations <span class="arithmatex">\(M_A\)</span> and <span class="arithmatex">\(M_B\)</span>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>\text{Winner}(K) = \begin{cases}
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>M_A &amp; \text{if } M_A.hlc &gt;_{HLC} M_B.hlc \\
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>M_B &amp; \text{otherwise}
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>\end{cases}
+</span></code></pre></div>
+<h3 id="convergence-theorem">Convergence Theorem</h3>
+<p>Under epidemic pairwise gossip across any connected graph component <span class="arithmatex">\(G = (V, E)\)</span>, the database state <span class="arithmatex">\(S_i(t)\)</span> of every node <span class="arithmatex">\(i\)</span> monotonically converges:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>\lim_{t \to \infty} S_i(t) = S_j(t) = \bigcup_{k \in \text{Keys}} \max_{&lt;_{HLC}} \left( \text{Mutations}(k) \right)
+</span></code></pre></div>
+<p>All replicas independently reach 100% causal identity without central coordination or distributed consensus rounds.</p>
+<hr />
+<h2 id="5-durable-sqlite-persistence-seam">5. Durable SQLite Persistence Seam</h2>
+<p>AirDB provides production-ready, durable storage engines across all platforms:
+* <strong>Android / JVM</strong>: <code>SqliteAirDbAdapter</code> in <code>:airdb-adapter-sqlite</code>.
+* <strong>Apple Platforms</strong>: <code>SqliteDbAdapter</code> in <code>AirDbKit</code> utilizing native <code>libsqlite3</code>.</p>
+<h3 id="schema-architecture-change-tracking">Schema Architecture &amp; Change Tracking</h3>
+<p>The underlying storage maintains an append-only, indexed changelog table alongside domain tables:</p>
+<div class="language-sql highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="k">IF</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">EXISTS</span><span class="w"> </span><span class="n">_airdb_changes</span><span class="w"> </span><span class="p">(</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="n">collection</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="n">id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="n">mutation_type</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="n">payload</span><span class="w"> </span><span class="nb">BLOB</span><span class="p">,</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="n">hlc_timestamp</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">    </span><span class="n">author_public_key</span><span class="w"> </span><span class="nb">BLOB</span><span class="p">,</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">    </span><span class="n">signature</span><span class="w"> </span><span class="nb">BLOB</span><span class="p">,</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">    </span><span class="n">created_at</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">    </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">collection</span><span class="p">,</span><span class="w"> </span><span class="n">id</span><span class="p">)</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="p">);</span>
+</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>
+</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="k">IF</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">EXISTS</span><span class="w"> </span><span class="n">idx_airdb_changes_hlc</span>
+</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="k">ON</span><span class="w"> </span><span class="n">_airdb_changes</span><span class="p">(</span><span class="n">hlc_timestamp</span><span class="w"> </span><span class="k">ASC</span><span class="p">);</span>
+</span></code></pre></div>
+<h3 id="durability-acid-guarantees">Durability &amp; ACID Guarantees</h3>
+<ol>
+<li><strong>Write-Ahead Logging (WAL)</strong>: All adapters enable <code>PRAGMA journal_mode = WAL</code> and <code>PRAGMA synchronous = NORMAL</code>, permitting non-blocking concurrent readers during write transactions.</li>
+<li><strong>Atomic Batch Application</strong>: Inbound delta batches are applied inside an immediate transaction (<code>BEGIN IMMEDIATE</code> ... <code>COMMIT</code>). If verification fails or disk write aborts, the transaction rolls back cleanly.</li>
+<li><strong>Anti-Resurrection Tombstone Lifecycle</strong>: Soft-deleted entities retain an entry with <code>mutation_type = 2</code> (DELETE) and the tombstone HLC timestamp. Any inbound mutation with an older timestamp is discarded, preventing obsolete sync passes from resurrecting deleted records.</li>
+</ol>
+<hr />
+<h2 id="6-zero-trust-cryptographic-mesh-provenance">6. Zero-Trust Cryptographic Mesh &amp; Provenance</h2>
+<p>In off-grid, multi-hop mesh deployments (such as disaster survivor coordination or remote mobile POS networks), packets pass through intermediate relay devices that may be untrusted, misconfigured, or adversarial. AirDB implements a two-tier <strong>Zero-Trust Cryptographic Mesh</strong>.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>+---------------------------------------------------------------------------------+
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>| Layer 1: Cluster-Level Symmetric AEAD (RFC 8439 ChaCha20-Poly1305)             |
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>| Encrypts over-the-air payload, binds packet header as AAD, authenticates link  |
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>+---------------------------------------------------------------------------------+
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>| Layer 2: Record-Level Asymmetric Signatures (RFC 8032 Ed25519)                 |
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>| Cryptographically binds each mutation to author public key, prevents forgery   |
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>+---------------------------------------------------------------------------------+
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>| Layer 3: Key Derivation &amp; Session Materials (RFC 5869 HKDF-SHA256)             |
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>| Deterministically derives cluster and session keys from shared pre-shared keys |
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>+---------------------------------------------------------------------------------+
+</span></code></pre></div>
+<h3 id="layer-1-cluster-level-symmetric-aead-chacha20-poly1305">Layer 1: Cluster-Level Symmetric AEAD (ChaCha20-Poly1305)</h3>
+<p>To prevent eavesdropping and unauthorized packet injection into a local operational cluster:
+1. <strong>AEAD Cipher</strong>: ChaCha20-Poly1305 (RFC 8439) with a 256-bit symmetric <code>clusterKey</code>.
+2. <strong>Header Authentication Binding (AAD)</strong>: The entire 23-byte (or 31-byte) wire header—including <code>magic</code>, <code>version</code>, <code>type</code>, <code>flags</code>, <code>timestamp</code>, <code>payloadLength</code>, <code>senderId</code>, and optional <code>recipientId</code>—is passed as Authenticated Additional Data (<span class="arithmatex">\(AAD\)</span>).
+3. <strong>Nonce Construction</strong>: A fresh 12-byte CSPRNG nonce is generated for every encrypted transmission.
+4. <strong>Wire Representation</strong>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>\text{WirePayload} = \text{Nonce}_{12\text{B}} \parallel \text{Ciphertext}_{N\text{B}} \parallel \text{Tag}_{16\text{B}}
+</span></code></pre></div>
+<p>Any modification to the header flags, timestamp, or ciphertext causes Poly1305 verification failure, resulting in silent drop before payload parsing.</p>
+<h3 id="layer-2-record-level-asymmetric-signatures-ed25519">Layer 2: Record-Level Asymmetric Signatures (Ed25519)</h3>
+<p>Cluster encryption protects over-the-air frames between immediate peers. However, in a multi-hop mesh network, intermediate relay nodes decrypt and forward packets. To ensure malicious or compromised relays cannot forge, alter, or backdate database records, every mutation is digitally signed by the original author.</p>
+<h4 id="canonical-signing-tuple">Canonical Signing Tuple</h4>
+<p>For a record <span class="arithmatex">\(R\)</span>, the canonical byte representation for signing is:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>M(R) = \text{collection} \parallel \text{id} \parallel \text{type} \parallel \text{hlcTimestamp} \parallel \text{payload}
+</span></code></pre></div>
+<h4 id="signature-generation">Signature Generation</h4>
+<p>The originating node signs <span class="arithmatex">\(M(R)\)</span> using its private Ed25519 key:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>\sigma = \text{Ed25519Sign}(\text{PrivateKey}_{author}, M(R))
+</span></code></pre></div>
+<p>The resulting 32-byte author public key and 64-byte signature <span class="arithmatex">\(\sigma\)</span> are attached directly to the <code>ChangeRecord</code>.</p>
+<h4 id="zero-trust-verification-rule">Zero-Trust Verification Rule</h4>
+<p>When a receiving node processes incoming records with <code>enforceSignatures = true</code>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>\text{Valid}(R) = \begin{cases}
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>1 &amp; \text{if } \text{Ed25519Verify}(\text{PublicKey}_{author}, M(R), \sigma) = \text{true} \\
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>0 &amp; \text{otherwise}
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>\end{cases}
+</span></code></pre></div>
+<p>If <span class="arithmatex">\(\text{Valid}(R) = 0\)</span>, the mutation is dropped immediately. It is never applied to the local database adapter nor forwarded to downstream gossip peers.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.tracking", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
