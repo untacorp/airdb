@@ -18,6 +18,7 @@ rootProject.name = "airdb"
 
 include(":airdb-adapter-api")
 include(":airdb-adapter-sqlite")
+include(":airdb-adapter-aerolog")
 include(":airdb-protocol")
 include(":airdb-transport-api")
 include(":airdb-transport-sim")
