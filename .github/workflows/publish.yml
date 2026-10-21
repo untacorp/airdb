@@ -85,6 +85,11 @@ jobs:
             TAG_NAME="v${{ inputs.version || '0.2.0' }}"
           fi
 
+          NOTES_ARG="--generate-notes"
+          if [ -f "RELEASE_NOTES_${TAG_NAME}.md" ]; then
+            NOTES_ARG="--notes-file RELEASE_NOTES_${TAG_NAME}.md"
+          fi
+
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
             echo "Release $TAG_NAME already exists, attaching bundle..."
             gh release upload "$TAG_NAME" build/bundle.zip#airdb-maven-bundle.zip --clobber
@@ -92,6 +97,6 @@ jobs:
             echo "Creating GitHub Release $TAG_NAME..."
             gh release create "$TAG_NAME" \
               --title "$TAG_NAME: AirDB Decentralized Replication Engine" \
-              --generate-notes \
+              $NOTES_ARG \
               build/bundle.zip#airdb-maven-bundle.zip
           fi
