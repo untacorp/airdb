@@ -1,0 +1,204 @@
+# AirDB Full Knowledge Base for AI Agents
+
+This consolidated document provides the complete API reference, wire schemas, cryptographic contracts, and database integration cookbooks for AirDB.
+
+---
+
+## 1. Core Architectural Contracts
+
+### Kotlin API Contracts (`io.airdb.adapter`)
+
+```kotlin
+package io.airdb.adapter
+
+enum class MutationType {
+    INSERT,
+    UPDATE,
+    DELETE
+}
+
+data class ChangeRecord(
+    val id: String,
+    val collection: String,
+    val type: MutationType,
+    val payload: ByteArray,
+    val hlcTimestamp: String,
+    val authorPublicKey: ByteArray? = null,
+    val signature: ByteArray? = null
+) {
+    val isSigned: Boolean get() = authorPublicKey != null && signature != null
+}
+
+interface AirDbAdapter {
+    suspend fun getChangesSince(sinceHlcTimestamp: String?, limit: Int): List<ChangeRecord>
+    suspend fun applyChanges(changes: List<ChangeRecord>)
+    suspend fun getLatestHlc(): String?
+}
+```
+
+### Swift API Contracts (`AirDbKit`)
+
+```swift
+import Foundation
+
+public enum MutationType: Int, Sendable {
+    case insert = 0
+    case update = 1
+    case delete = 2
+}
+
+public struct ChangeRecord: Sendable, Equatable {
+    public let id: String
+    public let collection: String
+    public let type: MutationType
+    public let payload: Data
+    public let hlcTimestamp: String
+    public let authorPublicKey: Data?
+    public let signature: Data?
+
+    public var isSigned: Boolean {
+        authorPublicKey != nil && signature != nil
+    }
+}
+
+public protocol AirDbAdapter: Sendable {
+    func getChangesSince(sinceHlcTimestamp: String?, limit: Int) async throws -> [ChangeRecord]
+    func applyChanges(_ changes: [ChangeRecord]) async throws
+    func getLatestHlc() async throws -> String?
+}
+```
+
+---
+
+## 2. Cryptographic Mesh Contracts
+
+### RFC 8439 ChaCha20-Poly1305 AEAD
+- **Cluster Key**: 256-bit (32 bytes) symmetric key shared by cluster nodes.
+- **Nonce**: 12-byte CSPRNG generated per packet.
+- **Poly1305 Tag**: 16-byte MAC tag appended to ciphertext.
+- **Authenticated Additional Data (AAD)**: Exact 23-byte (or 31-byte) wire header bytes. Header cannot be tampered without failing authentication.
+
+### RFC 8032 Ed25519 Digital Signatures
+- **Author Public Key**: 32 bytes.
+- **Author Signature**: 64 bytes.
+- **Canonical Signing Tuple**:
+  `M(R) = UTF8(collection) + UTF8(id) + Byte(mutationType.ordinal) + UTF8(hlcTimestamp) + payloadBytes`
+
+### Kotlin Cryptographic Utility (`io.airdb.crypto`)
+```kotlin
+object ChaCha20Poly1305Cipher {
+    fun encrypt(plaintext: ByteArray, key: ByteArray, aad: ByteArray? = null): ByteArray
+    fun decrypt(ciphertextWithNonceAndTag: ByteArray, key: ByteArray, aad: ByteArray? = null): ByteArray
+}
+
+object Ed25519Signer {
+    data class KeyPair(val publicKey: ByteArray, val privateKey: ByteArray)
+    fun generateKeyPair(): KeyPair
+    fun sign(data: ByteArray, privateKey: ByteArray): ByteArray
+    fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean
+}
+
+object HkdfSha256 {
+    fun deriveKey(ikm: ByteArray, salt: ByteArray? = null, info: ByteArray? = null, outputLength: Int = 32): ByteArray
+}
+```
+
+### Swift Cryptographic Utility (`AirDbKit`)
+```swift
+public enum ChaChaPolyCipher {
+    public static func encrypt(plaintext: Data, key: Data, aad: Data? = nil) throws -> Data
+    public static func decrypt(ciphertext: Data, key: Data, aad: Data? = nil) throws -> Data
+}
+
+public enum Ed25519Signer {
+    public struct KeyPair: Sendable {
+        public let publicKey: Data
+        public let privateKey: Data
+    }
+    public static func generateKeyPair() throws -> KeyPair
+    public static func sign(data: Data, privateKey: Data) throws -> Data
+    public static func verify(data: Data, signature: Data, publicKey: Data) -> Bool
+}
+
+public enum HkdfSha256 {
+    public static func deriveKey(secret: Data, salt: Data? = nil, info: Data? = nil, outputByteCount: Int = 32) throws -> Data
+}
+```
+
+---
+
+## 3. Wire Framing & Protocol Types
+
+### Packet Types
+- `0x01`: `HANDSHAKE`
+- `0x02`: `HANDSHAKE_ACK`
+- `0x03`: `RECONCILE_REQ`
+- `0x04`: `RECONCILE_RESP`
+- `0x05`: `DELTA_BATCH`
+- `0x06`: `DELTA_ACK`
+- `0x0F`: `FRAGMENT`
+
+### Packet Flags
+- `0x01`: `FLAG_COMPRESSED` (zlib Deflate)
+- `0x02`: `FLAG_HAS_RECIPIENT` (8-byte recipient ID present)
+- `0x04`: `FLAG_ENCRYPTED` (ChaCha20-Poly1305 ciphertext payload)
+
+### Delta Batch Record Flags
+- `0x80`: `FLAG_RECORD_SIGNED` (Record contains trailing 32B public key and 64B signature)
+
+---
+
+## 4. Complete Integration Recipes
+
+### Pattern 1: Android Room Adapter
+```kotlin
+class RoomAirDbAdapter(private val db: AppDatabase) : AirDbAdapter {
+    override suspend fun getChangesSince(sinceHlcTimestamp: String?, limit: Int): List<ChangeRecord> {
+        return if (sinceHlcTimestamp == null) {
+            db.airDbDao().getEarliest(limit)
+        } else {
+            db.airDbDao().getAfter(sinceHlcTimestamp, limit)
+        }.map { it.toChangeRecord() }
+    }
+
+    override suspend fun applyChanges(changes: List<ChangeRecord>) {
+        db.withTransaction {
+            for (change in changes) {
+                val current = db.airDbDao().getLatestHlc(change.collection, change.id)
+                if (current == null || change.hlcTimestamp > current) {
+                    db.airDbDao().upsert(change.toEntity())
+                }
+            }
+        }
+    }
+
+    override suspend fun getLatestHlc(): String? = db.airDbDao().getMaxHlc()
+}
+```
+
+### Pattern 2: Apple Native SQLite Adapter (`SqliteDbAdapter`)
+```swift
+let documentsUrl = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+let dbPath = documentsUrl.appendingPathComponent("airdb.db").path
+let adapter = try SqliteDbAdapter(databasePath: dbPath)
+let transport = CoreBluetoothTransport()
+
+let engine = AirDbEngine(
+    nodeName: "ios-field-01",
+    adapter = adapter,
+    transport = transport,
+    clusterKey: clusterKey,
+    authorKeyPair: authorKeyPair,
+    enforceSignatures = true
+)
+engine.start()
+```
+
+---
+
+## 5. Critical Invariants for AI Coding Agents
+
+1. **Zero-Emoji Policy**: Absolutely 0 emoji characters in code, docstrings, commits, or documentation.
+2. **Deflate Repetition Trap**: Test strings with repetitive bytes compress heavily (~95% ratio). In unit tests for fragmentation, always use `maxChunkSize <= 50` or non-repetitive payloads to verify chunk partitioning.
+3. **Single-Flight GATT Queue**: In Android Bluetooth, never call `writeCharacteristic` outside `GattOperationQueue`.
+4. **Pure Apple Standard Library**: Never add external CocoaPods or SPM packages to `AirDbKit`. Use native `libsqlite3`, `CryptoKit`, `Compression`, and `CoreBluetooth`.

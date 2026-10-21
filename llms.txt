@@ -1,0 +1,34 @@
+# AirDB for AI Coding Agents
+
+> AirDB is a decentralized, local-first peer-to-peer database replication engine operating over Bluetooth Low Energy (BLE) with zero internet connectivity and zero central servers. It features monotonic Hybrid Logical Clocks (HLC), Vector Clocks, an RFC 8439 ChaCha20-Poly1305 AEAD symmetric cipher, RFC 8032 Ed25519 digital signatures, and pluggable persistence adapters (BYOD).
+
+## System Invariants & Rules for Code Generation
+
+When generating code using AirDB, AI agents (Cursor, Copilot, Antigravity, Claude, ChatGPT) MUST enforce the following rules:
+
+1. **Zero-Emoji Policy**: Never generate emoji characters in code, docstrings, comments, commit messages, or markdown documentation.
+2. **Bring Your Own Database (BYOD)**: Any database can be integrated by implementing `AirDbAdapter` (`getChangesSince`, `applyChanges`, `getLatestHlc`). Never hardcode direct database assumptions into `AirDbEngine`.
+3. **Sans-I/O Architecture**: Core state machines, clocks, and protocol frames are pure functions. Platform Bluetooth APIs belong exclusively to transport implementations (`AndroidBleTransport`, `CoreBluetoothTransport`).
+4. **Single-Flight GATT Discipline**: The Android BLE stack permits only 1 in-flight operation per link. All Bluetooth writes must pass through `GattOperationQueue`. Never call `writeCharacteristic` directly from application threads.
+5. **Zero Third-Party Dependencies on Apple**: `AirDbKit` relies strictly on Apple standard frameworks (`CryptoKit`, `Compression`, `CoreBluetooth`, and `libsqlite3`). Never introduce third-party CocoaPods or SPM packages into `AirDbKit`.
+6. **Zero-Trust Cryptographic Verification**: When `enforceSignatures = true`, inbound `ChangeRecord` objects must be verified against their 32-byte Ed25519 author public key before `applyChanges` is invoked.
+
+## Documentation Index & Direct Links
+
+- [Architecture & Causality Mathematics](docs/ARCHITECTURE.md): Total order HLC, Vector Clocks, LWW conflict resolution, and convergence theorem.
+- [Wire Protocol Specification](docs/PROTOCOL_SPEC.md): Binary frame layout (23B/31B header), ChaCha20-Poly1305 AEAD envelope with AAD binding, and 13-byte fragment envelope.
+- [Getting Started Guide](docs/GETTING_STARTED.md): Step-by-step initialization for Kotlin/Android and Swift/iOS.
+- [Security Policy & Threat Model](SECURITY.md): Cryptographic guarantees, RF eavesdropping protection, and vulnerability disclosure.
+- [Coding & Engineering Standards](docs/CODING_STANDARDS.md): Concurrency rules, immutability, and testing standards.
+- [Full Context Bundle](llms-full.txt): Complete consolidated API definitions, wire schemas, and cookbook recipes in a single file.
+
+## Integration Cookbooks (BYOD)
+
+- [Android Room Integration](docs/cookbooks/room-android.md)
+- [SQLDelight Multiplatform](docs/cookbooks/sqldelight.md)
+- [Android & JVM SQLite WAL Adapter](docs/cookbooks/sqlite-android.md)
+- [Apple GRDB.swift Integration](docs/cookbooks/grdb-ios.md)
+- [Apple SwiftData Integration (iOS 17+)](docs/cookbooks/swiftdata-ios.md)
+- [Apple CoreData Integration](docs/cookbooks/coredata-ios.md)
+- [Apple Native libsqlite3 Adapter](docs/cookbooks/sqlite-apple.md)
+- [In-Memory Key-Value Adapter](docs/cookbooks/in-memory-kv.md)
