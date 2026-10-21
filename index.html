@@ -521,6 +521,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#acknowledgements-prior-art" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acknowledgements &amp; Prior Art
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1615,6 +1626,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#acknowledgements-prior-art" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acknowledgements &amp; Prior Art
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1671,6 +1693,17 @@
 <li><a href="cookbooks/room-android/">BYOD Cookbooks</a>: Guides for Room, GRDB, SwiftData, SQLDelight, CoreData, and SQLite.</li>
 <li><a href="SECURITY/">Security Policy</a>: Threat model and cryptographic verification invariants.</li>
 <li><a href="adr/0001-sans-io-architecture/">Architecture Decision Records (ADRs)</a>: Design rationales and trade-offs.</li>
+</ul>
+<hr />
+<h2 id="acknowledgements-prior-art">Acknowledgements &amp; Prior Art</h2>
+<p>AirDB's protocols, architecture, and design decisions were informed and inspired by foundational research and open-source projects across distributed systems, cryptography, and wireless mesh networks:</p>
+<ul>
+<li><strong>BitChat</strong>: For demonstrating the feasibility of ad-hoc mobile Bluetooth Low Energy (BLE) mesh communication, dual-role GATT operation, and opportunistic store-and-forward relay mechanics in off-grid environments. AirDB is a clean-room implementation engineered specifically for structured database replication and causal consistency (CRDT/HLC), rather than ephemeral messaging.</li>
+<li><strong>Hybrid Logical Clocks (HLC)</strong>: Based on the research paper <em>"Logical Physical Clocks and Consistent Snapshots in Globally Distributed Databases"</em> by Sandeep Kulkarni, Murat Demirbas, David Madeppa, Bharath Balasubramanian, and Sugumar Radhakrishnan (2014).</li>
+<li><strong>Vector Clocks &amp; Distributed Ordering</strong>: Grounded in the foundational research of Leslie Lamport (1978), Colin Fidge (1988), and Friedemann Mattern (1988) on causal event ordering, partial order lattices, and state reconciliation.</li>
+<li><strong>The Local-First Software Movement</strong>: Inspired by the manifesto <em>"Local-First Software: You Own Your Data, in spite of the Cloud"</em> by Martin Kleppmann, Adam Wiggins, Peter van Hardenberg, and Mark McGranaghan (Ink &amp; Switch, 2019).</li>
+<li><strong>SQLite Engine</strong>: Informed by D. Richard Hipp's architectural principles of crash resilience, Write-Ahead Logging (WAL), and zero-dependency embedded persistence.</li>
+<li><strong>RFC Cryptographic Standards</strong>: RFC 8439 (ChaCha20-Poly1305 AEAD), RFC 8032 (Ed25519 Digital Signatures), and RFC 5869 (HKDF-SHA256).</li>
 </ul>
 
 
