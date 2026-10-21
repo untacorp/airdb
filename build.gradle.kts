@@ -4,6 +4,19 @@ plugins {
     signing
 }
 
+allprojects {
+    configurations.all {
+        resolutionStrategy {
+            eachDependency {
+                if (requested.group == "org.bouncycastle") {
+                    useVersion("1.86")
+                    because("Fix CVE-2026-8763 (Critical) and CVE-2026-13506 (High)")
+                }
+            }
+        }
+    }
+}
+
 subprojects {
     if (!path.startsWith(":airdb-samples")) {
         apply(plugin = "maven-publish")
@@ -12,6 +25,17 @@ subprojects {
 
         group = "io.github.untacorp"
         version = "0.2.0"
+
+        dependencies {
+            constraints {
+                add("implementation", "org.bouncycastle:bcprov-jdk18on:1.86") {
+                    because("Fix CVE-2026-8763 (Critical) and CVE-2026-13506 (High)")
+                }
+                add("implementation", "org.bouncycastle:bcpg-jdk18on:1.86") {
+                    because("Fix CVE-2026-8763 (Critical) and CVE-2026-13506 (High)")
+                }
+            }
+        }
 
         configure<JavaPluginExtension> {
             withSourcesJar()
