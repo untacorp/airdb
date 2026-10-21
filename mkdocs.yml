@@ -12,27 +12,30 @@ theme:
   name: material
   palette:
     - scheme: default
-      primary: indigo
+      primary: custom
       accent: indigo
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - scheme: slate
-      primary: indigo
+      primary: custom
       accent: indigo
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
   features:
-    - navigation.tabs
     - navigation.sections
     - navigation.expand
+    - navigation.indexes
     - navigation.top
     - navigation.tracking
     - search.suggest
     - search.highlight
     - content.code.copy
     - content.tabs.link
+
+extra_css:
+  - stylesheets/extra.css
 
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js
@@ -59,33 +62,46 @@ markdown_extensions:
       generic: true
 
 nav:
-  - Overview: index.md
+  - Home: index.md
+  - About:
+      - Introduction: about/index.md
+      - Before You Start: about/before-you-start.md
+      - List of Features: about/features.md
+      - Frequently Asked Questions: about/faq.md
   - Getting Started:
-      - Quickstart: GETTING_STARTED.md
-      - Apple Platforms: AirDbKit.md
-  - Architecture:
-      - Engine & Causality: ARCHITECTURE.md
-      - Wire Protocol: PROTOCOL_SPEC.md
-      - Coding Standards: CODING_STANDARDS.md
-  - BYOD Cookbooks:
-      - Android Room: cookbooks/room-android.md
-      - SQLDelight Multiplatform: cookbooks/sqldelight.md
-      - Android SQLite WAL: cookbooks/sqlite-android.md
-      - Apple GRDB.swift: cookbooks/grdb-ios.md
-      - Apple SwiftData: cookbooks/swiftdata-ios.md
-      - Apple CoreData: cookbooks/coredata-ios.md
-      - Apple Native SQLite: cookbooks/sqlite-apple.md
-      - In-Memory KV: cookbooks/in-memory-kv.md
-  - Architecture Decisions:
-      - 0001 Sans-I/O Architecture: adr/0001-sans-io-architecture.md
-      - 0002 HLC Conflict Resolution: adr/0002-hlc-conflict-resolution.md
-      - 0003 Single-Flight GATT Queue: adr/0003-single-flight-gatt-queue.md
-      - 0004 Durable SQLite Persistence: adr/0004-sqlite-persistence-seam.md
-      - 0005 Zero-Trust Cryptographic Mesh: adr/0005-zero-trust-cryptographic-mesh.md
-  - Security & FAQ:
-      - Security Policy: SECURITY.md
-      - Frequently Asked Questions: FAQ.md
-  - Reference & Publishing:
-      - Publishing Guide: PUBLISHING.md
-      - Contributing: CONTRIBUTING.md
-      - Changelog: CHANGELOG.md
+      - Overview: getting-started/index.md
+      - Installation & Setup: getting-started/installation.md
+      - 5-Minute Quickstart: getting-started/quickstart.md
+      - Apple Platforms Guide: getting-started/apple-airdbkit.md
+      - Step-by-Step Tutorial: getting-started/first-app-tutorial.md
+  - Manual:
+      - Overview: manual/index.md
+      - Storage & Persistence (BYOD):
+          - Overview & Seam Contract: manual/persistence/index.md
+          - Built-in SQLite Engine: manual/persistence/sqlite.md
+          - Android Jetpack Room: manual/persistence/room.md
+          - SQLDelight Multiplatform: manual/persistence/sqldelight.md
+          - Apple Native SQLite: manual/persistence/apple-sqlite.md
+          - Apple GRDB.swift: manual/persistence/apple-grdb.md
+          - Apple SwiftData: manual/persistence/apple-swiftdata.md
+          - Apple CoreData: manual/persistence/apple-coredata.md
+          - In-Memory KV Store: manual/persistence/in-memory.md
+      - How Synchronization Works: manual/causality/how-sync-works.md
+      - Security & Cryptographic Mesh: manual/cryptography/security-mesh.md
+      - Networking & BLE Transports: manual/networking/wire-and-ble.md
+      - Testing Without Hardware: manual/simulation/testing-with-simulator.md
+  - Community & Contributing:
+      - Contributing to AirDB: community/contributing.md
+      - Coding & Engineering Standards: community/coding-standards.md
+      - Architecture Decision Records:
+          - 0001 Sans-I/O Architecture: community/adr/0001-sans-io-architecture.md
+          - 0002 HLC Conflict Resolution: community/adr/0002-hlc-conflict-resolution.md
+          - 0003 Single-Flight GATT Queue: community/adr/0003-single-flight-gatt-queue.md
+          - 0004 Durable SQLite Persistence: community/adr/0004-sqlite-persistence-seam.md
+          - 0005 Zero-Trust Cryptographic Mesh: community/adr/0005-zero-trust-cryptographic-mesh.md
+      - Security Policy: community/security.md
+      - Package Distribution & Publishing: community/publishing.md
+      - Changelog: community/changelog.md
+  - Reference:
+      - Wire Protocol Specification: reference/wire-spec.md
+      - API Contracts Reference: reference/api-contracts.md

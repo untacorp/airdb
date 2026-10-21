@@ -1,12 +1,12 @@
-# Cookbook: SQLDelight Multiplatform Integration
+# SQLDelight Multiplatform Integration
 
-This guide demonstrates how to integrate AirDB with **SQLDelight** (Kotlin Multiplatform / Android / JVM / iOS).
+This guide demonstrates how to integrate AirDB with **SQLDelight** in Kotlin Multiplatform (KMP), Android, and JVM projects.
 
 ---
 
 ## 1. Schema Definition (`AirDbChangelog.sq`)
 
-Create an SQLDelight definition file in `src/commonMain/sqldelight/io/airdb/storage/AirDbChangelog.sq`:
+Create an SQLDelight definition file in your project at `src/commonMain/sqldelight/io/airdb/storage/AirDbChangelog.sq`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS airdb_changelog (
@@ -39,10 +39,6 @@ LIMIT :limit;
 getLatestHlc:
 SELECT MAX(hlc_timestamp) FROM airdb_changelog;
 
-getRecordHlc:
-SELECT hlc_timestamp FROM airdb_changelog
-WHERE collection = :collection AND id = :id;
-
 upsertChange:
 INSERT OR REPLACE INTO airdb_changelog (
     collection, id, mutation_type, payload, hlc_timestamp, author_public_key, signature, created_at
@@ -53,21 +49,21 @@ INSERT OR REPLACE INTO airdb_changelog (
 
 ---
 
-## 2. Implementing `AirDbAdapter`
+## 2. Implementing the `AirDbAdapter`
 
 ```kotlin
 package io.airdb.storage.sqldelight
 
 import io.airdb.adapter.AirDbAdapter
 import io.airdb.adapter.ChangeRecord
+import io.airdb.adapter.HlcComparator
 import io.airdb.adapter.MutationType
-import io.airdb.storage.AirDbDatabase
 
 class SqlDelightAirDbAdapter(
-    private val database: AirDbDatabase
+    private val db: Database
 ) : AirDbAdapter {
 
-    private val queries = database.airDbChangelogQueries
+    private val queries = db.airDbChangelogQueries
 
     override suspend fun getChangesSince(sinceHlcTimestamp: String?, limit: Int): List<ChangeRecord> {
         val rows = if (sinceHlcTimestamp == null) {
@@ -80,7 +76,7 @@ class SqlDelightAirDbAdapter(
             ChangeRecord(
                 id = row.id,
                 collection = row.collection,
-                type = MutationType.entries[row.mutation_type.toInt()],
+                type = MutationType.fromCode(row.mutation_type.toInt()),
                 payload = row.payload,
                 hlcTimestamp = row.hlc_timestamp,
                 authorPublicKey = row.author_public_key,
@@ -90,24 +86,19 @@ class SqlDelightAirDbAdapter(
     }
 
     override suspend fun applyChanges(changes: List<ChangeRecord>) {
-        database.transaction {
-            val now = System.currentTimeMillis()
+        db.transaction {
             for (change in changes) {
-                val currentHlc = queries.getRecordHlc(change.collection, change.id).executeAsOneOrNull()
-
-                // Last-Write-Wins (LWW) check
-                if (currentHlc == null || change.hlcTimestamp > currentHlc) {
-                    queries.upsertChange(
-                        collection = change.collection,
-                        id = change.id,
-                        mutationType = change.type.ordinal.toLong(),
-                        payload = change.payload,
-                        hlcTimestamp = change.hlcTimestamp,
-                        authorPublicKey = change.authorPublicKey,
-                        signature = change.signature,
-                        createdAt = now
-                    )
-                }
+                // Apply LWW and insert into changelog
+                queries.upsertChange(
+                    collection = change.collection,
+                    id = change.id,
+                    mutationType = change.type.code.toLong(),
+                    payload = change.payload,
+                    hlcTimestamp = change.hlcTimestamp,
+                    authorPublicKey = change.authorPublicKey,
+                    signature = change.signature,
+                    createdAt = System.currentTimeMillis()
+                )
             }
         }
     }

@@ -15,20 +15,22 @@ When generating code using AirDB, AI agents (Cursor, Copilot, Antigravity, Claud
 
 ## Documentation Index & Direct Links
 
-- [Architecture & Causality Mathematics](docs/ARCHITECTURE.md): Total order HLC, Vector Clocks, LWW conflict resolution, and convergence theorem.
-- [Wire Protocol Specification](docs/PROTOCOL_SPEC.md): Binary frame layout (23B/31B header), ChaCha20-Poly1305 AEAD envelope with AAD binding, and 13-byte fragment envelope.
-- [Getting Started Guide](docs/GETTING_STARTED.md): Step-by-step initialization for Kotlin/Android and Swift/iOS.
-- [Security Policy & Threat Model](SECURITY.md): Cryptographic guarantees, RF eavesdropping protection, and vulnerability disclosure.
-- [Coding & Engineering Standards](docs/CODING_STANDARDS.md): Concurrency rules, immutability, and testing standards.
+- [About AirDB & Before You Start](docs/about/index.md): Conceptual overview, mental models, and prerequisites.
+- [Getting Started & Quickstart](docs/getting-started/quickstart.md): Step-by-step initialization for Kotlin/Android and Swift/iOS.
+- [Engine Manual](docs/manual/index.md): Causality mathematics, HLC, Vector Clocks, and convergence proofs.
+- [Security & Cryptographic Mesh](docs/manual/cryptography/security-mesh.md): ChaCha20-Poly1305 AEAD, Ed25519 digital signatures, and HKDF.
+- [Wire Protocol Specification](docs/reference/wire-spec.md): Binary frame layout (23B/31B header), AEAD envelope with AAD binding, and 13-byte fragment envelope.
+- [Coding & Engineering Standards](docs/community/coding-standards.md): Concurrency rules, immutability, and testing standards.
+- [Security Policy & Threat Model](docs/community/security.md): Cryptographic guarantees, RF eavesdropping protection, and vulnerability disclosure.
 - [Full Context Bundle](llms-full.txt): Complete consolidated API definitions, wire schemas, and cookbook recipes in a single file.
 
 ## Integration Cookbooks (BYOD)
 
-- [Android Room Integration](docs/cookbooks/room-android.md)
-- [SQLDelight Multiplatform](docs/cookbooks/sqldelight.md)
-- [Android & JVM SQLite WAL Adapter](docs/cookbooks/sqlite-android.md)
-- [Apple GRDB.swift Integration](docs/cookbooks/grdb-ios.md)
-- [Apple SwiftData Integration (iOS 17+)](docs/cookbooks/swiftdata-ios.md)
-- [Apple CoreData Integration](docs/cookbooks/coredata-ios.md)
-- [Apple Native libsqlite3 Adapter](docs/cookbooks/sqlite-apple.md)
-- [In-Memory Key-Value Adapter](docs/cookbooks/in-memory-kv.md)
+- [Android Room Integration](docs/manual/persistence/room.md)
+- [SQLDelight Multiplatform](docs/manual/persistence/sqldelight.md)
+- [Android & JVM SQLite WAL Engine](docs/manual/persistence/sqlite.md)
+- [Apple GRDB.swift Integration](docs/manual/persistence/apple-grdb.md)
+- [Apple SwiftData Integration (iOS 17+)](docs/manual/persistence/apple-swiftdata.md)
+- [Apple CoreData Integration](docs/manual/persistence/apple-coredata.md)
+- [Apple Native libsqlite3 Guide](docs/manual/persistence/apple-sqlite.md)
+- [In-Memory Key-Value Adapter](docs/manual/persistence/in-memory.md)

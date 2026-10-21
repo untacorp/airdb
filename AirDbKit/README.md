@@ -197,7 +197,7 @@ print("Author public key: \(record.authorPublicKey?.count ?? 0) bytes")
 
 ## Wire Protocol Compatibility
 
-AirDbKit adheres strictly to `docs/PROTOCOL_SPEC.md`:
+AirDbKit adheres strictly to the AirDB Wire Protocol Specification ([`docs/reference/wire-spec.md`](../docs/reference/wire-spec.md)):
 
 - **GATT Service UUID**: `41697244-4200-0000-8000-00805F9B34FB`
 - **GATT Characteristic UUID**: `41697244-4201-0000-8000-00805F9B34FB`

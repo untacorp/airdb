@@ -1,16 +1,18 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to AirDB are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
 
 ## [0.2.0] - 2026-10-21
 
 ### Added
 - **Zero-Trust Cryptographic Mesh (`airdb-crypto` & `AirDbKit/Crypto`)**:
   - RFC 8439 ChaCha20-Poly1305 AEAD symmetric cipher using Java 17 JCA on Android/JVM and Apple `CryptoKit` on Apple platforms.
-  - RFC 8032 Ed25519 digital signatures with canonical byte serialization for author provenance and non-repudiation across untrusted mesh relay nodes.
+  - RFC 8032 Ed25519 digital signatures with canonical byte serialization for author provenance across untrusted mesh relay nodes.
   - RFC 5869 HKDF-SHA256 key derivation utility for cluster and session key derivation.
   - Wire protocol `FLAG_ENCRYPTED = 0x04` binding full 23B/31B packet headers as Authenticated Additional Data ($AAD$).
   - Delta batch `FLAG_RECORD_SIGNED = 0x80` encoding 32-byte author public key and 64-byte Ed25519 signature.
@@ -29,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Continuous Integration Hardening**:
   - Dual-platform CI matrix covering Linux (OpenJDK 17) and macOS ARM64 (Swift 5.9+ / Xcode).
   - Least-privilege GitHub Actions workflow configuration (`permissions: contents: read`).
-  - GitHub Actions upgraded to Node 24 runtime actions.
 
 ---
 

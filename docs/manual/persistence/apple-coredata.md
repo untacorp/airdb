@@ -1,4 +1,4 @@
-# Cookbook: Apple CoreData Integration (iOS & macOS)
+# Apple CoreData Integration (iOS & macOS)
 
 This guide shows how to integrate AirDB with **CoreData** in iOS and macOS applications using `NSPersistentContainer` and background execution contexts.
 
@@ -59,7 +59,7 @@ public final class CoreDataAirDbAdapter: AirDbAdapter, @unchecked Sendable {
                 let payload = obj.value(forKey: "payload") as? Data ?? Data()
                 let authorPublicKey = obj.value(forKey: "authorPublicKey") as? Data
                 let signature = obj.value(forKey: "signature") as? Data
-                
+
                 return ChangeRecord(
                     id: id,
                     collection: collection,
@@ -76,33 +76,30 @@ public final class CoreDataAirDbAdapter: AirDbAdapter, @unchecked Sendable {
     public func applyChanges(_ changes: [ChangeRecord]) async throws {
         try await persistentContainer.performBackgroundTask { context in
             for change in changes {
-                let targetKey = "\(change.collection):\(change.id)"
+                let key = "\(change.collection):\(change.id)"
                 let request = NSFetchRequest<NSManagedObject>(entityName: "AirDbChangeEntity")
-                request.predicate = NSPredicate(format: "compositeKey == %@", targetKey)
+                request.predicate = NSPredicate(format: "compositeKey == %@", key)
                 request.fetchLimit = 1
-                
+
                 let existing = try context.fetch(request).first
-                let currentHlc = existing?.value(forKey: "hlcTimestamp") as? String
-                
-                // Last-Write-Wins (LWW) check
-                if currentHlc == nil || change.hlcTimestamp > currentHlc! {
-                    let obj = existing ?? NSEntityDescription.insertNewObject(
-                        forEntityName: "AirDbChangeEntity",
-                        into: context
-                    )
-                    
-                    obj.setValue(targetKey, forKey: "compositeKey")
-                    obj.setValue(change.collection, forKey: "collection")
-                    obj.setValue(change.id, forKey: "recordId")
-                    obj.setValue(Int16(change.type.rawValue), forKey: "mutationType")
-                    obj.setValue(change.payload, forKey: "payload")
-                    obj.setValue(change.hlcTimestamp, forKey: "hlcTimestamp")
-                    obj.setValue(change.authorPublicKey, forKey: "authorPublicKey")
-                    obj.setValue(change.signature, forKey: "signature")
-                    obj.setValue(Date(), forKey: "createdAt")
+                if let existing = existing,
+                   let existingHlc = existing.value(forKey: "hlcTimestamp") as? String,
+                   HlcComparator.compare(change.hlcTimestamp, existingHlc) <= 0 {
+                    continue
                 }
+
+                let target = existing ?? NSEntityDescription.insertNewObject(forEntityName: "AirDbChangeEntity", into: context)
+                target.setValue(key, forKey: "compositeKey")
+                target.setValue(change.collection, forKey: "collection")
+                target.setValue(change.id, forKey: "recordId")
+                target.setValue(Int16(change.type.rawValue), forKey: "mutationType")
+                target.setValue(change.payload, forKey: "payload")
+                target.setValue(change.hlcTimestamp, forKey: "hlcTimestamp")
+                target.setValue(change.authorPublicKey, forKey: "authorPublicKey")
+                target.setValue(change.signature, forKey: "signature")
+                target.setValue(Date(), forKey: "createdAt")
             }
-            
+
             if context.hasChanges {
                 try context.save()
             }
@@ -114,8 +111,7 @@ public final class CoreDataAirDbAdapter: AirDbAdapter, @unchecked Sendable {
             let request = NSFetchRequest<NSManagedObject>(entityName: "AirDbChangeEntity")
             request.sortDescriptors = [NSSortDescriptor(key: "hlcTimestamp", ascending: false)]
             request.fetchLimit = 1
-            let result = try context.fetch(request).first
-            return result?.value(forKey: "hlcTimestamp") as? String
+            return try context.fetch(request).first?.value(forKey: "hlcTimestamp") as? String
         }
     }
 }

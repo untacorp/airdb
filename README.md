@@ -7,8 +7,8 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0%2B-purple.svg)](https://kotlinlang.org)
 [![Swift](https://img.shields.io/badge/Swift-5.9%2B-orange.svg)](AirDbKit/)
-[![Architecture](https://img.shields.io/badge/Architecture-Sans--I%2FO-success.svg)](docs/ARCHITECTURE.md)
-[![Security](https://img.shields.io/badge/Security-Zero--Trust%20Mesh-blueviolet.svg)](docs/ARCHITECTURE.md#6-zero-trust-cryptographic-mesh--provenance)
+[![Architecture](https://img.shields.io/badge/Architecture-Sans--I%2FO-success.svg)](docs/manual/index.md)
+[![Security](https://img.shields.io/badge/Security-Zero--Trust%20Mesh-blueviolet.svg)](docs/manual/cryptography/security-mesh.md)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](#testing)
 
 *Zero Internet. Zero Central Servers. Automatic Peer Reconciliation. Cryptographic Provenance.*
@@ -226,18 +226,26 @@ To run the interactive off-grid disaster response sync simulation:
 
 ## Documentation Directory
 
-- [Architecture Guide](docs/ARCHITECTURE.md): Concurrency, Sans-I/O, causality contracts, and cryptographic mesh.
-- [Wire Protocol Specification](docs/PROTOCOL_SPEC.md): Binary packet layouts, AEAD framing, and fragment headers.
-- [Getting Started Guide](docs/GETTING_STARTED.md): Step-by-step Room, SQLite, and AirDbKit integration guide.
-- [Coding Standards](docs/CODING_STANDARDS.md): Guidelines on concurrency, immutability, and tests.
-- [Frequently Asked Questions (FAQ)](docs/FAQ.md): Detailed answers to operational, security, and design questions.
-- [Security Policy](SECURITY.md): Threat modeling, cryptographic guarantees, and disclosure procedures.
-- [Architecture Decision Records (ADR)](docs/adr/): Context and justifications for foundational decisions:
-  - [ADR 0001: Sans-I/O Architecture](docs/adr/0001-sans-io-architecture.md)
-  - [ADR 0002: HLC Conflict Resolution](docs/adr/0002-hlc-conflict-resolution.md)
-  - [ADR 0003: Single-Flight GATT Queue](docs/adr/0003-single-flight-gatt-queue.md)
-  - [ADR 0004: Durable SQLite Persistence Seam](docs/adr/0004-sqlite-persistence-seam.md)
-  - [ADR 0005: Zero-Trust Cryptographic Mesh](docs/adr/0005-zero-trust-cryptographic-mesh.md)
+- [Introduction & Overview](docs/about/index.md): What AirDB is, why off-grid sync matters, and core pillars.
+- [Before You Start](docs/about/before-you-start.md): Mental models, BLE bandwidth realities, and platform requirements.
+- [Getting Started & Quickstart](docs/getting-started/quickstart.md): Step-by-step 5-minute initialization for Kotlin and Swift.
+- [Engine Manual](docs/manual/index.md): Concurrency, Sans-I/O, and architectural breakdown.
+- [Bring Your Own Database (BYOD)](docs/manual/persistence/index.md): SQLite, Room, SQLDelight, GRDB, SwiftData, and CoreData integration.
+- [How Synchronization Works](docs/manual/causality/how-sync-works.md): Hybrid Logical Clocks (HLC), Vector Clocks, and convergence proofs.
+- [Security & Cryptographic Mesh](docs/manual/cryptography/security-mesh.md): ChaCha20-Poly1305 AEAD, Ed25519 digital signatures, and HKDF.
+- [Wire Protocol & BLE Networking](docs/manual/networking/wire-and-ble.md): Packet framing, compression, MTU fragmentation, and queue concurrency.
+- [Testing Without Hardware](docs/manual/simulation/testing-with-simulator.md): Sans-I/O in-memory simulation engine.
+- [Frequently Asked Questions (FAQ)](docs/about/faq.md): Answers to operational, security, and design questions.
+- [Security Policy](docs/community/security.md): Threat modeling, cryptographic guarantees, and disclosure procedures.
+- [Coding Standards](docs/community/coding-standards.md): Guidelines on concurrency, immutability, and tests.
+- [Architecture Decision Records (ADRs)](docs/community/adr/): Design rationales and trade-offs:
+  - [ADR 0001: Sans-I/O Architecture](docs/community/adr/0001-sans-io-architecture.md)
+  - [ADR 0002: HLC Conflict Resolution](docs/community/adr/0002-hlc-conflict-resolution.md)
+  - [ADR 0003: Single-Flight GATT Queue](docs/community/adr/0003-single-flight-gatt-queue.md)
+  - [ADR 0004: Durable SQLite Persistence Seam](docs/community/adr/0004-sqlite-persistence-seam.md)
+  - [ADR 0005: Zero-Trust Cryptographic Mesh](docs/community/adr/0005-zero-trust-cryptographic-mesh.md)
+- [Wire Protocol Specification](docs/reference/wire-spec.md): Formal binary packet layout table and bitmasks.
+- [API Contracts Reference](docs/reference/api-contracts.md): Cheat sheet for Kotlin and Swift interfaces.
 
 ---
 

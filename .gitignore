@@ -55,3 +55,8 @@ Thumbs.db
 .build/
 .swiftpm/
 
+# MkDocs build and virtual environments
+site/
+.venv/
+
+

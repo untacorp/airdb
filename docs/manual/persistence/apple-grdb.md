@@ -1,6 +1,6 @@
-# Cookbook: GRDB.swift Integration (iOS & macOS)
+# GRDB.swift Integration (iOS & macOS)
 
-[GRDB.swift](https://github.com/groue/GRDB.swift) is a toolkit for SQLite databases in Swift applications. This guide shows how to implement `AirDbAdapter` with GRDB using `DatabaseQueue` or `DatabasePool`.
+[GRDB.swift](https://github.com/groue/GRDB.swift) is a popular SQLite toolkit for iOS and macOS. This guide shows how to implement `AirDbAdapter` with GRDB using `DatabaseQueue` or `DatabasePool`.
 
 ---
 
@@ -70,24 +70,20 @@ public final class GrdbAirDbAdapter: AirDbAdapter, @unchecked Sendable {
             return rows.compactMap { row -> ChangeRecord? in
                 guard let id: String = row["id"],
                       let collection: String = row["collection"],
-                      let rawType: Int = row["mutation_type"],
-                      let type = MutationType(rawValue: rawType),
+                      let typeInt: Int = row["mutation_type"],
+                      let type = MutationType(rawValue: typeInt),
                       let hlc: String = row["hlc_timestamp"] else {
                     return nil
                 }
-                
-                let payload: Data = row["payload"] ?? Data()
-                let authorPublicKey: Data? = row["author_public_key"]
-                let signature: Data? = row["signature"]
                 
                 return ChangeRecord(
                     id: id,
                     collection: collection,
                     type: type,
-                    payload: payload,
+                    payload: row["payload"] ?? Data(),
                     hlcTimestamp: hlc,
-                    authorPublicKey: authorPublicKey,
-                    signature: signature
+                    authorPublicKey: row["author_public_key"],
+                    signature: row["signature"]
                 )
             }
         }
@@ -95,35 +91,41 @@ public final class GrdbAirDbAdapter: AirDbAdapter, @unchecked Sendable {
 
     public func applyChanges(_ changes: [ChangeRecord]) async throws {
         try await dbWriter.write { db in
-            let now = Int64(Date().timeIntervalSince1970 * 1000)
-            
             for change in changes {
-                let currentHlc = try String.fetchOne(
+                // Apply LWW conflict resolution
+                let existingHlc: String? = try String.fetchOne(
                     db,
                     sql: "SELECT hlc_timestamp FROM _airdb_changes WHERE collection = ? AND id = ?",
                     arguments: [change.collection, change.id]
                 )
-                
-                // Last-Write-Wins (LWW) check
-                if currentHlc == nil || change.hlcTimestamp > currentHlc! {
-                    try db.execute(
-                        sql: """
-                        INSERT OR REPLACE INTO _airdb_changes (
-                            collection, id, mutation_type, payload, hlc_timestamp, author_public_key, signature, created_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        arguments: [
-                            change.collection,
-                            change.id,
-                            change.type.rawValue,
-                            change.payload,
-                            change.hlcTimestamp,
-                            change.authorPublicKey,
-                            change.signature,
-                            now
-                        ]
-                    )
+
+                if let existing = existingHlc, HlcComparator.compare(change.hlcTimestamp, existing) <= 0 {
+                    continue
                 }
+
+                try db.execute(
+                    sql: """
+                    INSERT INTO _airdb_changes (collection, id, mutation_type, payload, hlc_timestamp, author_public_key, signature, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(collection, id) DO UPDATE SET
+                        mutation_type = excluded.mutation_type,
+                        payload = excluded.payload,
+                        hlc_timestamp = excluded.hlc_timestamp,
+                        author_public_key = excluded.author_public_key,
+                        signature = excluded.signature,
+                        created_at = excluded.created_at
+                    """,
+                    arguments: [
+                        change.collection,
+                        change.id,
+                        change.type.rawValue,
+                        change.payload,
+                        change.hlcTimestamp,
+                        change.authorPublicKey,
+                        change.signature,
+                        Int64(Date().timeIntervalSince1970 * 1000)
+                    ]
+                )
             }
         }
     }
@@ -134,32 +136,4 @@ public final class GrdbAirDbAdapter: AirDbAdapter, @unchecked Sendable {
         }
     }
 }
-```
-
----
-
-## 3. Engine Setup
-
-```swift
-import AirDbKit
-import GRDB
-
-let dbQueue = try DatabaseQueue(path: "/path/to/database.sqlite")
-var migrator = DatabaseMigrator()
-migrator.registerAirDbMigrations()
-try migrator.migrate(dbQueue)
-
-let adapter = GrdbAirDbAdapter(dbWriter: dbQueue)
-let transport = CoreBluetoothTransport()
-
-let engine = AirDbEngine(
-    nodeName: "ios-posko-unit-01",
-    adapter = adapter,
-    transport = transport,
-    clusterKey = clusterKey,
-    authorKeyPair = authorKeyPair,
-    enforceSignatures = true
-)
-
-engine.start()
 ```
