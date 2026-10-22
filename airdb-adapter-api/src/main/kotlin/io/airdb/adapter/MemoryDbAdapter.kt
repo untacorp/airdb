@@ -24,10 +24,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 class MemoryDbAdapter : AirDbAdapter {
 
-    // Storage for live entity states: collection -> (id -> ChangeRecord)
     private val tables = ConcurrentHashMap<String, ConcurrentHashMap<String, ChangeRecord>>()
-
-    // Append-only changelog sorted by insertion / HLC
     private val changelog = CopyOnWriteArrayList<ChangeRecord>()
 
     override suspend fun getChangesSince(sinceHlcTimestamp: String?, limit: Int): List<ChangeRecord> {
@@ -51,12 +48,11 @@ class MemoryDbAdapter : AirDbAdapter {
         for (change in changes) {
             val table = tables.getOrPut(change.collection) { ConcurrentHashMap() }
             val existing = table[change.id]
-
-            // Last-Write-Wins (LWW) check based on canonical HLC total ordering
-            if (existing == null || HlcComparator.compare(change.hlcTimestamp, existing.hlcTimestamp) > 0) {
-                table[change.id] = change
-                changelog.add(change)
+            if (existing != null && HlcComparator.compare(change.hlcTimestamp, existing.hlcTimestamp) <= 0) {
+                continue
             }
+            table[change.id] = change
+            changelog.add(change)
         }
     }
 

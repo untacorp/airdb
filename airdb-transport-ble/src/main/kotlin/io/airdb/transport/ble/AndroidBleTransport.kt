@@ -72,19 +72,16 @@ class AndroidBleTransport(
         this.clusterKey = key
     }
 
-    // Central (Client) role state
     private var scanner: BluetoothLeScanner? = null
     private val activeGattClients = ConcurrentHashMap<String, BluetoothGatt>()
     private val clientCharacteristics = ConcurrentHashMap<String, BluetoothGattCharacteristic>()
     private val negotiatedMtus = ConcurrentHashMap<String, Int>()
 
-    // Peripheral (Server) role state
     private var advertiser: BluetoothLeAdvertiser? = null
     private var gattServer: BluetoothGattServer? = null
     private var serverCharacteristic: BluetoothGattCharacteristic? = null
     private val subscribedCentrals = ConcurrentHashMap<String, BluetoothDevice>()
 
-    // Fragment assembly buffer per link
     private val assemblyBuffers = ConcurrentHashMap<String, AssemblyBuffer>()
 
     override fun setListener(listener: TransportListener) {
@@ -143,40 +140,30 @@ class AndroidBleTransport(
                 BinaryCodec.encode(fragment, clusterKey = key)
             }
 
-            // 1. Transmit via active GATT Client connections (to discovered Peripherals)
             for ((address, gatt) in activeGattClients) {
-                if (targetPeerId == null || targetPeerId == address) {
-                    val char = clientCharacteristics[address]
-                    if (char != null) {
-                        val linkId = "client-$address"
-                        val accepted = gattQueue.enqueue(linkId, encoded, isNotification = false) {
-                            writeCharacteristicCompat(gatt, char, encoded)
-                        }
-                        if (accepted) anyEnqueued = true
-                    }
-                }
+                if (targetPeerId != null && targetPeerId != address) continue
+                val char = clientCharacteristics[address] ?: continue
+                val linkId = "client-$address"
+                if (gattQueue.enqueue(linkId, encoded, isNotification = false) {
+                    writeCharacteristicCompat(gatt, char, encoded)
+                }) anyEnqueued = true
             }
 
-            // 2. Transmit via active GATT Server notifications (to subscribed Centrals)
             val server = gattServer
             val char = serverCharacteristic
             if (server != null && char != null) {
                 for ((address, central) in subscribedCentrals) {
-                    if (targetPeerId == null || targetPeerId == address) {
-                        val linkId = "server-$address"
-                        val accepted = gattQueue.enqueue(linkId, encoded, isNotification = true) {
-                            notifyCharacteristicCompat(server, central, char, encoded)
-                        }
-                        if (accepted) anyEnqueued = true
-                    }
+                    if (targetPeerId != null && targetPeerId != address) continue
+                    val linkId = "server-$address"
+                    if (gattQueue.enqueue(linkId, encoded, isNotification = true) {
+                        notifyCharacteristicCompat(server, central, char, encoded)
+                    }) anyEnqueued = true
                 }
             }
         }
 
         return anyEnqueued
     }
-
-    // MARK: - Central (Client) Scanning & Connection
 
     private fun startScanning() {
         scanner = bluetoothAdapter?.bluetoothLeScanner
@@ -206,12 +193,11 @@ class AndroidBleTransport(
             val address = device.address
 
             if (activeGattClients.containsKey(address) || subscribedCentrals.containsKey(address)) {
-                return // Already connected or subscribed
+                return
             }
 
             listener?.onTransportEvent(TransportEvent.PeerDiscovered(address, result.rssi))
 
-            // Connect GATT Client
             val gatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 device.connectGatt(context, false, gattClientCallback, BluetoothDevice.TRANSPORT_LE)
             } else {
@@ -231,7 +217,6 @@ class AndroidBleTransport(
             val linkId = "client-$address"
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                // Request maximum MTU
                 gatt.requestMtu(config.targetMtu)
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 activeGattClients.remove(address)
@@ -266,7 +251,6 @@ class AndroidBleTransport(
             clientCharacteristics[address] = characteristic
             gatt.setCharacteristicNotification(characteristic, true)
 
-            // Subscribe to remote notifications via CCCD
             val cccd = characteristic.getDescriptor(config.cccdUuid)
             if (cccd != null) {
                 gattQueue.enqueue(linkId, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE, isNotification = false) {
@@ -298,8 +282,6 @@ class AndroidBleTransport(
             handleInboundBytes(data, peerId = gatt.device.address, linkId = "client-${gatt.device.address}")
         }
     }
-
-    // MARK: - Peripheral (Server) Hosting & Advertising
 
     private fun startGattServer() {
         gattServer = bluetoothManager?.openGattServer(context, gattServerCallback) ?: return
@@ -426,8 +408,6 @@ class AndroidBleTransport(
         }
     }
 
-    // MARK: - Inbound Ingestion & Reassembly
-
     private fun handleInboundBytes(data: ByteArray, peerId: String, linkId: String) {
         val key = clusterKey
         val rawPacket = BinaryCodec.decode(data, clusterKey = key) ?: return
@@ -451,8 +431,6 @@ class AndroidBleTransport(
             )
         )
     }
-
-    // MARK: - API Compatibility Helpers
 
     private fun writeCharacteristicCompat(
         gatt: BluetoothGatt,

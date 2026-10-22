@@ -144,7 +144,6 @@ class GattOperationQueue(
                     true
                 }
             } else {
-                // Operation exhausted all retries, drop it to prevent infinite loop
                 state.pending.pollFirst()
                 state.pendingBytes -= head.data.size
                 if (state.pending.isNotEmpty()) {
@@ -211,7 +210,6 @@ class GattOperationQueue(
                 }
                 return
             } else {
-                // Operation completed or exhausted retries
                 state.pending.pollFirst()
                 state.pendingBytes -= head.data.size
 

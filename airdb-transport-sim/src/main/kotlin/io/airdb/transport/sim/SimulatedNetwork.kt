@@ -40,7 +40,6 @@ class SimulatedNetwork(
     fun register(nodeId: String, transport: SimulatedTransport) {
         nodes[nodeId] = transport
 
-        // Inform other nodes about this new node (discovery & link-up)
         for ((existingId, existingTransport) in nodes) {
             if (existingId != nodeId) {
                 scope.launch {
@@ -64,11 +63,11 @@ class SimulatedNetwork(
         scope.launch {
             if (targetPeerId != null) {
                 nodes[targetPeerId]?.deliver(senderNodeId, packet)
-            } else {
-                for ((peerId, transport) in nodes) {
-                    if (peerId != senderNodeId) {
-                        transport.deliver(senderNodeId, packet)
-                    }
+                return@launch
+            }
+            for ((peerId, transport) in nodes) {
+                if (peerId != senderNodeId) {
+                    transport.deliver(senderNodeId, packet)
                 }
             }
         }
@@ -107,7 +106,6 @@ class SimulatedTransport(
     override suspend fun send(packet: AirDbPacket, targetPeerId: String?): Boolean {
         if (!isRunning) return false
 
-        // Emulate MTU fragmentation
         val fragments = PacketFragmenter.fragment(packet, clusterKey = clusterKey, maxChunkSize = maxChunkSize)
         for (fragment in fragments) {
             val wirePacket = if (clusterKey != null && fragment.type != PacketType.FRAGMENT) {

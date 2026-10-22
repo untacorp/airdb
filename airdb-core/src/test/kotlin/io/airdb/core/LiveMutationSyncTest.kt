@@ -42,11 +42,9 @@ class LiveMutationSyncTest {
         val transportB = SimulatedTransport("node-b", network)
         val engineB = AirDbEngine("node-b", adapterB, transportB)
 
-        // Start both engines empty
         engineA.start()
         engineB.start()
 
-        // Wait for link-up handshake to finish
         delay(300)
 
         val latchLiveRecord = CountDownLatch(1)
@@ -56,7 +54,6 @@ class LiveMutationSyncTest {
             }
         }
 
-        // Commit a mutation on Node A while actively connected
         val record = engineA.saveRecord(
             collection = "triage",
             id = "triage-live-01",
@@ -64,7 +61,6 @@ class LiveMutationSyncTest {
             payload = "{\"patient\": \"Zulfikar\", \"condition\": \"RED\"}".toByteArray()
         )
 
-        // Verify Node B receives and applies it live without reconnecting
         assertTrue(
             latchLiveRecord.await(3, TimeUnit.SECONDS),
             "Node B must receive live mutation committed on Node A over existing active link"
@@ -89,7 +85,6 @@ class LiveMutationSyncTest {
         engine.start()
         engine.stop()
 
-        // Restarting engine should succeed and allow saving records and processing coroutines
         engine.start()
         val record = engine.saveRecord(
             collection = "triage",

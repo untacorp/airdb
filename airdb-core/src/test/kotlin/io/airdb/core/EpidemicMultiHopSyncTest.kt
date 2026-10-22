@@ -41,14 +41,12 @@ class EpidemicMultiHopSyncTest {
 
     @Test
     fun testTransitiveSyncViaDataMule() = runBlocking {
-        // Network 1: Camp Alpha location
         val campAlphaNet = SimulatedNetwork()
 
         val dbAlpha = MemoryDbAdapter()
         val transportAlpha = SimulatedTransport("camp-alpha", campAlphaNet)
         val engineAlpha = AirDbEngine("camp-alpha", dbAlpha, transportAlpha)
 
-        // Seed 3 emergency records at Camp Alpha
         for (i in 1..3) {
             engineAlpha.saveRecord(
                 collection = "survivors",
@@ -58,7 +56,6 @@ class EpidemicMultiHopSyncTest {
             )
         }
 
-        // Volunteer arrives at Camp Alpha
         val dbMule = MemoryDbAdapter()
         val transportMuleAtAlpha = SimulatedTransport("volunteer-mule", campAlphaNet)
         val engineMuleAtAlpha = AirDbEngine("volunteer-mule", dbMule, transportMuleAtAlpha)
@@ -76,20 +73,15 @@ class EpidemicMultiHopSyncTest {
 
         assertEquals(3, dbMule.getActiveRecords("survivors").size)
 
-        // Volunteer leaves Camp Alpha (disconnects radio)
         engineAlpha.stop()
         engineMuleAtAlpha.stop()
 
-        // -------------------------------------------------------------
-        // Volunteer travels 10km to Base Hospital (Network 2)
-        // -------------------------------------------------------------
         val hospitalNet = SimulatedNetwork()
 
         val dbHospital = MemoryDbAdapter()
         val transportHospital = SimulatedTransport("base-hospital", hospitalNet)
         val engineHospital = AirDbEngine("base-hospital", dbHospital, transportHospital)
 
-        // Volunteer connects to Hospital's network using the SAME accumulated dbMule!
         val transportMuleAtHospital = SimulatedTransport("volunteer-mule", hospitalNet)
         val engineMuleAtHospital = AirDbEngine("volunteer-mule", dbMule, transportMuleAtHospital)
 
@@ -104,7 +96,6 @@ class EpidemicMultiHopSyncTest {
         assertTrue(latchMuleToHospital.await(5, TimeUnit.SECONDS), "Base Hospital should sync from Volunteer Mule")
         delay(150)
 
-        // Verify Base Hospital received all 3 records originated by Camp Alpha!
         val hospitalRecords = dbHospital.getActiveRecords("survivors")
         assertEquals(3, hospitalRecords.size, "Base Hospital should have 3 survivor records")
         assertTrue(hospitalRecords.containsKey("alpha-victim-1"))

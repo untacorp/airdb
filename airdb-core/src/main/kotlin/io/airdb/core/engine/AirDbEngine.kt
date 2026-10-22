@@ -113,8 +113,6 @@ class AirDbEngine(
             record = record.sign(authorKeyPair)
         }
         adapter.applyChanges(listOf(record))
-
-        // Immediately trigger real-time delta streaming on active sessions
         sessions.values.forEach { it.notifyLocalMutation() }
         return record
     }
@@ -126,25 +124,29 @@ class AirDbEngine(
         syncListeners.add(listener)
     }
 
+    private fun createSession(peerId: String, linkId: String): SyncSession {
+        return SyncSession(
+            peerId = peerId,
+            linkId = linkId,
+            localNodeId = localNodeId,
+            localNodeName = nodeName,
+            adapter = adapter,
+            clock = clock,
+            vectorClock = vectorClock,
+            transport = transport,
+            scope = scope,
+            clusterKey = clusterKey,
+            authorKeyPair = authorKeyPair,
+            enforceSignatures = enforceSignatures
+        ) { pid, count ->
+            syncListeners.forEach { it(pid, count) }
+        }
+    }
+
     override fun onTransportEvent(event: TransportEvent) {
         when (event) {
             is TransportEvent.LinkConnected -> {
-                val session = SyncSession(
-                    peerId = event.peerId,
-                    linkId = event.linkId,
-                    localNodeId = localNodeId,
-                    localNodeName = nodeName,
-                    adapter = adapter,
-                    clock = clock,
-                    vectorClock = vectorClock,
-                    transport = transport,
-                    scope = scope,
-                    clusterKey = clusterKey,
-                    authorKeyPair = authorKeyPair,
-                    enforceSignatures = enforceSignatures
-                ) { peerId, changesApplied ->
-                    syncListeners.forEach { it(peerId, changesApplied) }
-                }
+                val session = createSession(event.peerId, event.linkId)
                 sessions[event.peerId] = session
                 session.start()
             }
@@ -155,23 +157,7 @@ class AirDbEngine(
 
             is TransportEvent.PacketReceived -> {
                 val session = sessions.computeIfAbsent(event.peerId) {
-                    val s = SyncSession(
-                        peerId = event.peerId,
-                        linkId = event.linkId,
-                        localNodeId = localNodeId,
-                        localNodeName = nodeName,
-                        adapter = adapter,
-                        clock = clock,
-                        vectorClock = vectorClock,
-                        transport = transport,
-                        scope = scope,
-                        clusterKey = clusterKey,
-                        authorKeyPair = authorKeyPair,
-                        enforceSignatures = enforceSignatures
-                    ) { peerId, changesApplied ->
-                        syncListeners.forEach { it(peerId, changesApplied) }
-                    }
-                    s
+                    createSession(event.peerId, event.linkId)
                 }
                 session.handlePacket(event.packet)
             }

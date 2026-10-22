@@ -41,9 +41,9 @@ object DeltaBatch {
             val collBytes = change.collection.toByteArray(Charsets.UTF_8)
             val hlcBytes = change.hlcTimestamp.toByteArray(Charsets.UTF_8)
 
-            val isSigned = change.isSigned &&
-                    change.authorPublicKey?.size == 32 &&
-                    change.signature?.size == 64
+            val pubKey = change.authorPublicKey
+            val sig = change.signature
+            val isSigned = change.isSigned && pubKey?.size == 32 && sig?.size == 64
 
             val typeByte = if (isSigned) {
                 ((change.type.ordinal and 0x7F) or FLAG_RECORD_SIGNED).toByte()
@@ -51,8 +51,6 @@ object DeltaBatch {
                 (change.type.ordinal and 0x7F).toByte()
             }
 
-            // Header for single change:
-            // IdLen(2) + Id + CollLen(2) + Coll + Type(1) + HlcLen(2) + Hlc + PayloadLen(4) + Payload
             val buf = ByteBuffer.allocate(2 + idBytes.size + 2 + collBytes.size + 1 + 2 + hlcBytes.size + 4)
                 .order(ByteOrder.BIG_ENDIAN)
 
@@ -69,8 +67,8 @@ object DeltaBatch {
             out.write(change.payload)
 
             if (isSigned) {
-                out.write(change.authorPublicKey!!)
-                out.write(change.signature!!)
+                out.write(pubKey)
+                out.write(sig)
             }
         }
 

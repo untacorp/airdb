@@ -42,7 +42,6 @@ class SyncSessionTest {
         val transportB = SimulatedTransport("nodeB", network)
         val engineB = AirDbEngine("nodeB", adapterB, transportB)
 
-        // Seed data in Node A before connection
         engineA.saveRecord(
             collection = "survivors",
             id = "survivor-101",
@@ -57,7 +56,6 @@ class SyncSessionTest {
             payload = "{\"item\": \"Bandages\", \"quantity\": 500}".toByteArray()
         )
 
-        // Seed different data in Node B before connection
         engineB.saveRecord(
             collection = "survivors",
             id = "survivor-102",
@@ -75,32 +73,26 @@ class SyncSessionTest {
             if (peerId == "nodeA") latchB.countDown()
         }
 
-        // Start radio on both nodes -> triggers simulated discovery & link-up
         engineA.start()
         engineB.start()
 
-        // Wait for sync exchange
         val syncSuccessA = latchA.await(5, TimeUnit.SECONDS)
         val syncSuccessB = latchB.await(5, TimeUnit.SECONDS)
 
         assertTrue(syncSuccessA, "Node A should have received changes from Node B")
         assertTrue(syncSuccessB, "Node B should have received changes from Node A")
 
-        // Small delay to ensure DB writes settle
         delay(200)
 
-        // Verify Node A now has Node B's records
         val bRecordInA = adapterA.getRecord("survivors", "survivor-102")
         assertNotNull(bRecordInA)
         assertEquals("Jane Smith", String(bRecordInA!!.payload).substringAfter("\"name\": \"").substringBefore("\""))
 
-        // Verify Node B now has Node A's records
         val aRecord1InB = adapterB.getRecord("survivors", "survivor-101")
         assertNotNull(aRecord1InB)
         val aRecord2InB = adapterB.getRecord("medical_supplies", "med-01")
         assertNotNull(aRecord2InB)
 
-        // Both nodes now hold identical sets of survivors
         assertEquals(2, adapterA.getAllRecords("survivors").size)
         assertEquals(2, adapterB.getAllRecords("survivors").size)
 

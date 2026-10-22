@@ -31,7 +31,6 @@ class SqliteDbAdapterTest {
     fun testFilePersistenceAcrossRestarts(@TempDir tempDir: Path) = runBlocking {
         val dbFile = File(tempDir.toFile(), "test_airdb.sqlite")
 
-        // Phase 1: Open and write records
         SqliteDbAdapter.open(dbFile).use { adapter ->
             val record1 = ChangeRecord(
                 id = "item-101",
@@ -47,7 +46,6 @@ class SqliteDbAdapterTest {
             assertEquals("First Aid Kit", String(retrieved!!.payload))
         }
 
-        // Database is closed now. Phase 2: Re-open the database file
         SqliteDbAdapter.open(dbFile).use { adapter ->
             val retrieved = adapter.getActiveRecord("supplies", "item-101")
             assertNotNull(retrieved)
@@ -63,7 +61,6 @@ class SqliteDbAdapterTest {
     @Test
     fun testLwwReconciliationInSqlite() = runBlocking {
         SqliteDbAdapter.inMemory().use { adapter ->
-            // Initial insert
             val rec1 = ChangeRecord(
                 id = "doc-1",
                 collection = "records",
@@ -74,7 +71,6 @@ class SqliteDbAdapterTest {
             adapter.applyChanges(listOf(rec1))
             assertEquals("Version 1", String(adapter.getActiveRecord("records", "doc-1")!!.payload))
 
-            // Newer mutation (counter 10 > 2 numerically)
             val rec2 = ChangeRecord(
                 id = "doc-1",
                 collection = "records",
@@ -85,7 +81,6 @@ class SqliteDbAdapterTest {
             adapter.applyChanges(listOf(rec2))
             assertEquals("Version 2", String(adapter.getActiveRecord("records", "doc-1")!!.payload))
 
-            // Stale mutation (counter 1 < 10) must be rejected
             val recStale = ChangeRecord(
                 id = "doc-1",
                 collection = "records",
@@ -101,7 +96,6 @@ class SqliteDbAdapterTest {
     @Test
     fun testTombstoneAntiResurrectionAndCompaction() = runBlocking {
         SqliteDbAdapter.inMemory().use { adapter ->
-            // Insert
             val insertRec = ChangeRecord(
                 id = "patient-007",
                 collection = "patients",
@@ -113,7 +107,6 @@ class SqliteDbAdapterTest {
             assertNotNull(adapter.getActiveRecord("patients", "patient-007"))
             assertFalse(adapter.isRecordDeleted("patients", "patient-007"))
 
-            // Soft-delete (tombstone)
             val deleteRec = ChangeRecord(
                 id = "patient-007",
                 collection = "patients",
@@ -125,7 +118,6 @@ class SqliteDbAdapterTest {
             assertNull(adapter.getActiveRecord("patients", "patient-007"))
             assertTrue(adapter.isRecordDeleted("patients", "patient-007"))
 
-            // Delayed packet arrives attempting resurrection with older HLC
             val lateInsert = ChangeRecord(
                 id = "patient-007",
                 collection = "patients",
@@ -135,14 +127,11 @@ class SqliteDbAdapterTest {
             )
             adapter.applyChanges(listOf(lateInsert))
 
-            // Anti-resurrection guaranteed: remains soft-deleted
             assertNull(adapter.getActiveRecord("patients", "patient-007"))
             assertTrue(adapter.isRecordDeleted("patients", "patient-007"))
 
-            // Compact tombstones older than threshold 1000-6-nodeA
             adapter.compact(pruneHlcThreshold = "1000-6-nodeA")
 
-            // After compaction, tombstone is purged completely from disk and changelog
             assertFalse(adapter.isRecordDeleted("patients", "patient-007"))
             assertNull(adapter.readEntity("patients", "patient-007"))
             val changelog = adapter.readChangelogSince(null, 100)
@@ -161,7 +150,6 @@ class SqliteDbAdapterTest {
                 )
             )
 
-            // Peer knows up to 1000-0-poskoA and nothing from poskoB
             val peerClock = mapOf("poskoA" to "1000-0-poskoA")
             val missing = adapter.getMissingChanges(peerClock)
 
@@ -174,8 +162,6 @@ class SqliteDbAdapterTest {
     @Test
     fun testReadChangelogSinceNumericOrderingAndLimit() = runBlocking {
         SqliteDbAdapter.inMemory().use { adapter ->
-            // In ASCII sorting, "1000-10-nodeA" is smaller than "1000-2-nodeA"
-            // But in canonical HLC numeric ordering, 10 > 2.
             adapter.applyChanges(
                 listOf(
                     ChangeRecord("rec-2", "tests", MutationType.INSERT, byteArrayOf(1), "1000-2-nodeA"),
@@ -184,13 +170,11 @@ class SqliteDbAdapterTest {
                 )
             )
 
-            // Reading since "1000-2-nodeA" must return rec-10 and rec-20 via SQL range scan
             val changesSince2 = adapter.readChangelogSince("1000-2-nodeA", limit = 10)
             assertEquals(2, changesSince2.size)
             assertEquals("rec-10", changesSince2[0].id)
             assertEquals("rec-20", changesSince2[1].id)
 
-            // Test strict limit
             val limited = adapter.readChangelogSince("1000-2-nodeA", limit = 1)
             assertEquals(1, limited.size)
             assertEquals("rec-10", limited[0].id)
@@ -200,7 +184,6 @@ class SqliteDbAdapterTest {
     @Test
     fun testLatestHlcDoesNotRegressOnOlderHistoricalSync() = runBlocking {
         SqliteDbAdapter.inMemory().use { adapter ->
-            // Local record created at newer HLC (seq = 1)
             adapter.applyChanges(
                 listOf(
                     ChangeRecord("local-1", "docs", MutationType.INSERT, "v1".toByteArray(), "1700000000000-0-nodeA")
@@ -208,17 +191,14 @@ class SqliteDbAdapterTest {
             )
             assertEquals("1700000000000-0-nodeA", adapter.getLatestHlc())
 
-            // Historical record synced from peer with older HLC (seq = 2)
             adapter.applyChanges(
                 listOf(
                     ChangeRecord("peer-historical", "docs", MutationType.INSERT, "v0".toByteArray(), "1600000000000-0-nodeB")
                 )
             )
 
-            // getLatestHlc MUST NOT regress to the older timestamp just because it was inserted later (seq = 2)
             assertEquals("1700000000000-0-nodeA", adapter.getLatestHlc())
 
-            // And counter ordering must be respected
             adapter.applyChanges(
                 listOf(
                     ChangeRecord("local-2", "docs", MutationType.INSERT, "v2".toByteArray(), "1700000000000-10-nodeA")

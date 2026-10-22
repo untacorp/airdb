@@ -100,32 +100,6 @@ abstract class AbstractAirDbAdapter : AirDbAdapter {
         return readChangelogSince(sinceHlcTimestamp, limit)
     }
 
-    override suspend fun getMissingChanges(peerClock: Map<String, String>, limit: Int): List<ChangeRecord> {
-        val missing = ArrayList<ChangeRecord>(limit)
-        var cursor: String? = null
-        val pageSize = maxOf(limit, 100)
-
-        while (missing.size < limit) {
-            val batch = readChangelogSince(cursor, limit = pageSize)
-            if (batch.isEmpty()) break
-
-            for (record in batch) {
-                val origin = HlcComparator.extractNodeId(record.hlcTimestamp) ?: ""
-                val peerKnown = peerClock[origin]
-                if (peerKnown == null || HlcComparator.compare(record.hlcTimestamp, peerKnown) > 0) {
-                    missing.add(record)
-                    if (missing.size >= limit) break
-                }
-            }
-
-            if (batch.size < pageSize) break
-            val maxHlc = batch.maxOfWith(HlcComparator) { it.hlcTimestamp }
-            if (maxHlc == cursor) break
-            cursor = maxHlc
-        }
-        return missing
-    }
-
     @Volatile
     private var maxSeenHlc: String? = null
 
@@ -133,10 +107,10 @@ abstract class AbstractAirDbAdapter : AirDbAdapter {
         executeInTransaction {
             for (change in changes) {
                 val existing = readEntity(change.collection, change.id)
-
-                // Last-Write-Wins (LWW) check based on canonical HLC total order
-                if (existing == null || HlcComparator.compare(change.hlcTimestamp, existing.hlcTimestamp) > 0) {
-                    val entity = StoredEntity(
+                if (existing != null && HlcComparator.compare(change.hlcTimestamp, existing.hlcTimestamp) <= 0) {
+                    continue
+                }
+                val entity = StoredEntity(
                         collection = change.collection,
                         id = change.id,
                         type = change.type,
@@ -146,7 +120,6 @@ abstract class AbstractAirDbAdapter : AirDbAdapter {
                     writeEntity(entity)
                     appendChangelog(change)
                     updateMaxSeenHlc(change.hlcTimestamp)
-                }
             }
         }
     }
@@ -185,6 +158,5 @@ abstract class AbstractAirDbAdapter : AirDbAdapter {
      * than [pruneHlcThreshold].
      */
     open suspend fun compact(pruneHlcThreshold: String) {
-        // Storage engines may override to physically purge tombstones past threshold
     }
 }

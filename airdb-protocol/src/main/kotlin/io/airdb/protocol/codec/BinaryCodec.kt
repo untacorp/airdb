@@ -52,7 +52,6 @@ object BinaryCodec {
         var flags = packet.flags.toInt()
         var payloadBytes = packet.payload
 
-        // 1. Auto compress if payload is above threshold and not already marked compressed
         if (payloadBytes.size > autoCompressThreshold && (flags and PacketFlags.FLAG_COMPRESSED.toInt()) == 0) {
             val compressed = Compression.compress(payloadBytes)
             if (compressed.size < payloadBytes.size) {
@@ -68,59 +67,45 @@ object BinaryCodec {
         }
         val headerSize = MIN_HEADER_SIZE + (if (hasRecipient) RECIPIENT_ID_SIZE else 0)
 
-        // 2. Encrypt if clusterKey provided
-        if (clusterKey != null) {
+        val isEncrypted = clusterKey != null
+        if (isEncrypted) {
             flags = flags or PacketFlags.FLAG_ENCRYPTED.toInt()
-            val encryptedLength = payloadBytes.size + ChaCha20Poly1305Cipher.NONCE_SIZE + ChaCha20Poly1305Cipher.TAG_SIZE
-            require(encryptedLength <= MAX_PAYLOAD_SIZE) {
-                "Encrypted payload exceeds max allowable size $MAX_PAYLOAD_SIZE: $encryptedLength"
-            }
-
-            // Construct exact header bytes to serve as Authenticated Additional Data (AAD)
-            val headerBuffer = ByteBuffer.allocate(headerSize).order(ByteOrder.BIG_ENDIAN)
-            headerBuffer.put(MAGIC_BYTE_0)
-            headerBuffer.put(MAGIC_BYTE_1)
-            headerBuffer.put(packet.version)
-            headerBuffer.put(packet.type.code)
-            headerBuffer.put(flags.toByte())
-            headerBuffer.putLong(packet.timestamp)
-            headerBuffer.putShort(encryptedLength.toShort())
-            headerBuffer.putLong(packet.senderId)
-
-            if (recipientId != null) {
-                headerBuffer.putLong(recipientId)
-            }
-
-            val aad = headerBuffer.array()
-            val encryptedPayload = ChaCha20Poly1305Cipher.encrypt(payloadBytes, clusterKey, aad)
-
-            val totalBuffer = ByteBuffer.allocate(headerSize + encryptedPayload.size).order(ByteOrder.BIG_ENDIAN)
-            totalBuffer.put(aad)
-            totalBuffer.put(encryptedPayload)
-            return totalBuffer.array()
-        } else {
-            require(payloadBytes.size <= MAX_PAYLOAD_SIZE) {
-                "Payload exceeds max allowable size $MAX_PAYLOAD_SIZE: ${payloadBytes.size}"
-            }
-
-            val totalSize = headerSize + payloadBytes.size
-            val buffer = ByteBuffer.allocate(totalSize).order(ByteOrder.BIG_ENDIAN)
-            buffer.put(MAGIC_BYTE_0)
-            buffer.put(MAGIC_BYTE_1)
-            buffer.put(packet.version)
-            buffer.put(packet.type.code)
-            buffer.put(flags.toByte())
-            buffer.putLong(packet.timestamp)
-            buffer.putShort(payloadBytes.size.toShort())
-            buffer.putLong(packet.senderId)
-
-            if (recipientId != null) {
-                buffer.putLong(recipientId)
-            }
-
-            buffer.put(payloadBytes)
-            return buffer.array()
         }
+
+        val payloadLength = if (isEncrypted) {
+            payloadBytes.size + ChaCha20Poly1305Cipher.NONCE_SIZE + ChaCha20Poly1305Cipher.TAG_SIZE
+        } else {
+            payloadBytes.size
+        }
+
+        require(payloadLength <= MAX_PAYLOAD_SIZE) {
+            "Payload exceeds max allowable size $MAX_PAYLOAD_SIZE: $payloadLength"
+        }
+
+        val headerBuffer = ByteBuffer.allocate(headerSize).order(ByteOrder.BIG_ENDIAN)
+        headerBuffer.put(MAGIC_BYTE_0)
+        headerBuffer.put(MAGIC_BYTE_1)
+        headerBuffer.put(packet.version)
+        headerBuffer.put(packet.type.code)
+        headerBuffer.put(flags.toByte())
+        headerBuffer.putLong(packet.timestamp)
+        headerBuffer.putShort(payloadLength.toShort())
+        headerBuffer.putLong(packet.senderId)
+        if (recipientId != null) {
+            headerBuffer.putLong(recipientId)
+        }
+
+        val aad = headerBuffer.array()
+        val finalPayload = if (clusterKey != null) {
+            ChaCha20Poly1305Cipher.encrypt(payloadBytes, clusterKey, aad)
+        } else {
+            payloadBytes
+        }
+
+        val totalBuffer = ByteBuffer.allocate(headerSize + finalPayload.size).order(ByteOrder.BIG_ENDIAN)
+        totalBuffer.put(aad)
+        totalBuffer.put(finalPayload)
+        return totalBuffer.array()
     }
 
     /**
@@ -161,7 +146,6 @@ object BinaryCodec {
         var payload = ByteArray(payloadLength)
         buffer.get(payload)
 
-        // Decrypt if encrypted
         val isEncrypted = (flags.toInt() and PacketFlags.FLAG_ENCRYPTED.toInt()) != 0
         if (isEncrypted) {
             if (clusterKey == null) {
@@ -175,7 +159,6 @@ object BinaryCodec {
             }
         }
 
-        // Decompress if compressed
         val isCompressed = (flags.toInt() and PacketFlags.FLAG_COMPRESSED.toInt()) != 0
         if (isCompressed) {
             try {
