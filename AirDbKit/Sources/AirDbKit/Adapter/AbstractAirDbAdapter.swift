@@ -85,12 +85,34 @@ public actor AdaptiveAirDbAdapter: AirDbAdapter {
     }
 
     public func getMissingChanges(peerClock: [String: String], limit: Int = 500) async throws -> [ChangeRecord] {
-        let candidates = try await storage.readChangelogSince(sinceHlcTimestamp: nil, limit: limit * 2)
-        return candidates.filter { record in
-            let origin = HlcComparator.extractNodeId(from: record.hlcTimestamp) ?? ""
-            guard let peerKnown = peerClock[origin] else { return true }
-            return HlcComparator.compare(record.hlcTimestamp, peerKnown) == .orderedDescending
-        }.prefix(limit).map { $0 }
+        var missing: [ChangeRecord] = []
+        missing.reserveCapacity(limit)
+        var cursor: String? = nil
+        let pageSize = max(limit, 100)
+
+        while missing.count < limit {
+            let batch = try await storage.readChangelogSince(sinceHlcTimestamp: cursor, limit: pageSize)
+            if batch.isEmpty { break }
+
+            for record in batch {
+                let origin = HlcComparator.extractNodeId(from: record.hlcTimestamp) ?? ""
+                if let peerKnown = peerClock[origin] {
+                    if HlcComparator.compare(record.hlcTimestamp, peerKnown) == .orderedDescending {
+                        missing.append(record)
+                        if missing.count >= limit { break }
+                    }
+                } else {
+                    missing.append(record)
+                    if missing.count >= limit { break }
+                }
+            }
+
+            if batch.count < pageSize { break }
+            guard let maxHlc = batch.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })?.hlcTimestamp, maxHlc != cursor else { break }
+            cursor = maxHlc
+        }
+
+        return missing
     }
 
     public func applyChanges(_ changes: [ChangeRecord]) async throws {
@@ -116,11 +138,51 @@ public actor AdaptiveAirDbAdapter: AirDbAdapter {
                 try await self.storage.appendChangelog(change)
             }
         }
+
+        for change in changes {
+            updateMaxSeenHlc(change.hlcTimestamp)
+        }
+    }
+
+    private var maxSeenHlc: String?
+
+    private func updateMaxSeenHlc(_ hlc: String) {
+        if let current = maxSeenHlc {
+            if HlcComparator.compare(hlc, current) == .orderedDescending {
+                maxSeenHlc = hlc
+            }
+        } else {
+            maxSeenHlc = hlc
+        }
     }
 
     public func getLatestHlc() async throws -> String? {
-        let changelog = try await storage.readChangelogSince(sinceHlcTimestamp: nil, limit: 1000)
-        return changelog.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })?.hlcTimestamp
+        if let cached = maxSeenHlc {
+            return cached
+        }
+
+        var cursor: String? = nil
+        var maxHlc: String? = nil
+        let pageSize = 1000
+
+        while true {
+            let batch = try await storage.readChangelogSince(sinceHlcTimestamp: cursor, limit: pageSize)
+            if batch.isEmpty { break }
+            for record in batch {
+                if let current = maxHlc {
+                    if HlcComparator.compare(record.hlcTimestamp, current) == .orderedDescending {
+                        maxHlc = record.hlcTimestamp
+                    }
+                } else {
+                    maxHlc = record.hlcTimestamp
+                }
+            }
+            if batch.count < pageSize { break }
+            cursor = batch.last?.hlcTimestamp
+        }
+
+        maxSeenHlc = maxHlc
+        return maxHlc
     }
 
     public func readEntity(collection: String, id: String) async throws -> StoredEntity? {

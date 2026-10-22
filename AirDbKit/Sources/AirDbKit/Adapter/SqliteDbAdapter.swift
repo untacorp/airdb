@@ -44,6 +44,17 @@ public enum SqliteError: Error, LocalizedError {
 /// Last-Write-Wins (LWW) conflict resolution, and tombstone compaction without any third-party dependencies.
 public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
     private var db: OpaquePointer?
+    private var maxSeenHlc: String?
+
+    private func updateMaxSeenHlc(_ hlc: String) {
+        if let current = maxSeenHlc {
+            if HlcComparator.compare(hlc, current) == .orderedDescending {
+                maxSeenHlc = hlc
+            }
+        } else {
+            maxSeenHlc = hlc
+        }
+    }
 
     /// Creates an isolated in-memory SQLite database instance (ideal for unit testing).
     public static func inMemory() throws -> SqliteDbAdapter {
@@ -118,16 +129,30 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
             type INTEGER NOT NULL,
             payload BLOB NOT NULL,
             hlc_timestamp TEXT NOT NULL,
+            physical_time INTEGER NOT NULL DEFAULT 0,
+            logical_counter INTEGER NOT NULL DEFAULT 0,
+            origin_node TEXT NOT NULL DEFAULT '',
             created_at INTEGER NOT NULL
         );
         """
         try executeSimple(db: db, sql: createChangelog)
+
+        // Safe migrations for pre-existing tables
+        try? executeSimple(db: db, sql: "ALTER TABLE airdb_changelog ADD COLUMN physical_time INTEGER NOT NULL DEFAULT 0;")
+        try? executeSimple(db: db, sql: "ALTER TABLE airdb_changelog ADD COLUMN logical_counter INTEGER NOT NULL DEFAULT 0;")
+        try? executeSimple(db: db, sql: "ALTER TABLE airdb_changelog ADD COLUMN origin_node TEXT NOT NULL DEFAULT '';")
 
         let createChangelogIdxHlc = """
         CREATE INDEX IF NOT EXISTS idx_changelog_hlc 
         ON airdb_changelog (hlc_timestamp);
         """
         try executeSimple(db: db, sql: createChangelogIdxHlc)
+
+        let createChangelogIdxComposite = """
+        CREATE INDEX IF NOT EXISTS idx_changelog_hlc_composite 
+        ON airdb_changelog (physical_time ASC, logical_counter ASC, origin_node ASC);
+        """
+        try executeSimple(db: db, sql: createChangelogIdxComposite)
 
         let createChangelogIdxColId = """
         CREATE INDEX IF NOT EXISTS idx_changelog_collection_id 
@@ -222,11 +247,30 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         if sqlite3_step(stmt) != SQLITE_DONE {
             throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
         }
+        updateMaxSeenHlc(entity.hlcTimestamp)
     }
 
     public func readChangelogSince(sinceHlcTimestamp: String?, limit: Int = 100) throws -> [ChangeRecord] {
         guard let db = db else { throw SqliteError.databaseClosed }
-        let sql = "SELECT collection, id, type, payload, hlc_timestamp FROM airdb_changelog ORDER BY seq ASC"
+
+        let parsedSince = sinceHlcTimestamp.flatMap { HlcComparator.parseHlcComponents($0) }
+        let sql: String
+        if let _ = parsedSince {
+            sql = """
+            SELECT collection, id, type, payload, hlc_timestamp 
+            FROM airdb_changelog 
+            WHERE (physical_time > ?) 
+               OR (physical_time = ? AND logical_counter > ?) 
+               OR (physical_time = ? AND logical_counter = ? AND origin_node > ?)
+            ORDER BY physical_time ASC, logical_counter ASC, origin_node ASC, seq ASC 
+            LIMIT ?;
+            """
+        } else if let _ = sinceHlcTimestamp {
+            sql = "SELECT collection, id, type, payload, hlc_timestamp FROM airdb_changelog WHERE hlc_timestamp > ? ORDER BY physical_time ASC, logical_counter ASC, origin_node ASC, seq ASC LIMIT ?;"
+        } else {
+            sql = "SELECT collection, id, type, payload, hlc_timestamp FROM airdb_changelog ORDER BY physical_time ASC, logical_counter ASC, origin_node ASC, seq ASC LIMIT ?;"
+        }
+
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
 
@@ -234,9 +278,23 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
             throw SqliteError.prepareFailed(String(cString: sqlite3_errmsg(db)))
         }
 
+        if let since = parsedSince {
+            sqlite3_bind_int64(stmt, 1, since.pt)
+            sqlite3_bind_int64(stmt, 2, since.pt)
+            sqlite3_bind_int(stmt, 3, Int32(since.lc))
+            sqlite3_bind_int64(stmt, 4, since.pt)
+            sqlite3_bind_int(stmt, 5, Int32(since.lc))
+            sqlite3_bind_text(stmt, 6, since.node, -1, sqliteTransient)
+            sqlite3_bind_int(stmt, 7, Int32(limit))
+        } else if let sinceStr = sinceHlcTimestamp {
+            sqlite3_bind_text(stmt, 1, sinceStr, -1, sqliteTransient)
+            sqlite3_bind_int(stmt, 2, Int32(limit))
+        } else {
+            sqlite3_bind_int(stmt, 1, Int32(limit))
+        }
+
         var records: [ChangeRecord] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
-            // Strict left-to-right column extraction (0, 1, 2, 3, 4)
             let collection = sqlite3_column_text(stmt, 0).flatMap { String(cString: $0) } ?? ""
             let id = sqlite3_column_text(stmt, 1).flatMap { String(cString: $0) } ?? ""
             let rawType = UInt8(sqlite3_column_int(stmt, 2))
@@ -252,12 +310,6 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
 
             let hlc = sqlite3_column_text(stmt, 4).flatMap { String(cString: $0) } ?? ""
 
-            if let since = sinceHlcTimestamp {
-                if HlcComparator.compare(hlc, since) != .orderedDescending {
-                    continue
-                }
-            }
-
             records.append(
                 ChangeRecord(
                     id: id,
@@ -267,20 +319,22 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                     hlcTimestamp: hlc
                 )
             )
-
-            if records.count >= limit {
-                break
-            }
         }
+        records.sort(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })
         return records
     }
 
     public func appendChangelog(_ record: ChangeRecord) throws {
         guard let db = db else { throw SqliteError.databaseClosed }
+        let components = HlcComparator.parseHlcComponents(record.hlcTimestamp)
+        let physicalTime = components?.pt ?? 0
+        let logicalCounter = components?.lc ?? 0
+        let originNode = components?.node ?? ""
+
         let sql = """
         INSERT INTO airdb_changelog 
-        (collection, id, type, payload, hlc_timestamp, created_at) 
-        VALUES (?, ?, ?, ?, ?, ?)
+        (collection, id, type, payload, hlc_timestamp, physical_time, logical_counter, origin_node, created_at) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
@@ -300,11 +354,15 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
             }
         }
         sqlite3_bind_text(stmt, 5, record.hlcTimestamp, -1, sqliteTransient)
-        sqlite3_bind_int64(stmt, 6, Int64(Date().timeIntervalSince1970 * 1000))
+        sqlite3_bind_int64(stmt, 6, physicalTime)
+        sqlite3_bind_int(stmt, 7, Int32(logicalCounter))
+        sqlite3_bind_text(stmt, 8, originNode, -1, sqliteTransient)
+        sqlite3_bind_int64(stmt, 9, Int64(Date().timeIntervalSince1970 * 1000))
 
         if sqlite3_step(stmt) != SQLITE_DONE {
             throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
         }
+        updateMaxSeenHlc(record.hlcTimestamp)
     }
 
     public func compact(pruneHlcThreshold: String) async throws {
@@ -334,10 +392,14 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         // Explicitly finalize SELECT cursor before executing mutations to release table lock
         sqlite3_finalize(selectStmt)
 
-        // Physically delete tombstones past the threshold by primary key within an atomic transaction
-        if !toDelete.isEmpty {
-            try executeSimple("BEGIN IMMEDIATE TRANSACTION;")
-            do {
+        let components = HlcComparator.parseHlcComponents(pruneHlcThreshold)
+        let thresholdPt = components?.pt ?? 0
+        let thresholdLc = components?.lc ?? 0
+
+        // Physically delete tombstones past the threshold within an atomic transaction
+        try executeSimple("BEGIN IMMEDIATE TRANSACTION;")
+        do {
+            if !toDelete.isEmpty {
                 let deleteSql = "DELETE FROM airdb_entities WHERE collection = ? AND id = ?"
                 var deleteStmt: OpaquePointer?
                 defer { sqlite3_finalize(deleteStmt) }
@@ -359,11 +421,33 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                         throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
                     }
                 }
-                try executeSimple("COMMIT TRANSACTION;")
-            } catch {
-                try? executeSimple("ROLLBACK TRANSACTION;")
-                throw error
             }
+
+            // Purge deleted records from airdb_changelog in a single atomic statement
+            let deleteChangelogSql = """
+            DELETE FROM airdb_changelog 
+            WHERE type = ? AND (physical_time < ? OR (physical_time = ? AND logical_counter <= ?));
+            """
+            var deleteChangelogStmt: OpaquePointer?
+            defer { sqlite3_finalize(deleteChangelogStmt) }
+
+            if sqlite3_prepare_v2(db, deleteChangelogSql, -1, &deleteChangelogStmt, nil) != SQLITE_OK {
+                throw SqliteError.prepareFailed(String(cString: sqlite3_errmsg(db)))
+            }
+
+            sqlite3_bind_int(deleteChangelogStmt, 1, Int32(MutationType.delete.rawValue))
+            sqlite3_bind_int64(deleteChangelogStmt, 2, thresholdPt)
+            sqlite3_bind_int64(deleteChangelogStmt, 3, thresholdPt)
+            sqlite3_bind_int64(deleteChangelogStmt, 4, Int64(thresholdLc))
+
+            if sqlite3_step(deleteChangelogStmt) != SQLITE_DONE {
+                throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
+            }
+
+            try executeSimple("COMMIT TRANSACTION;")
+        } catch {
+            try? executeSimple("ROLLBACK TRANSACTION;")
+            throw error
         }
     }
 
@@ -374,12 +458,34 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
     }
 
     public func getMissingChanges(peerClock: [String: String], limit: Int = 500) throws -> [ChangeRecord] {
-        let candidates = try readChangelogSince(sinceHlcTimestamp: nil, limit: limit * 2)
-        return candidates.filter { record in
-            let origin = HlcComparator.extractNodeId(from: record.hlcTimestamp) ?? ""
-            guard let peerKnown = peerClock[origin] else { return true }
-            return HlcComparator.compare(record.hlcTimestamp, peerKnown) == .orderedDescending
-        }.prefix(limit).map { $0 }
+        var missing: [ChangeRecord] = []
+        missing.reserveCapacity(limit)
+        var cursor: String? = nil
+        let pageSize = max(limit, 100)
+
+        while missing.count < limit {
+            let batch = try readChangelogSince(sinceHlcTimestamp: cursor, limit: pageSize)
+            if batch.isEmpty { break }
+
+            for record in batch {
+                let origin = HlcComparator.extractNodeId(from: record.hlcTimestamp) ?? ""
+                if let peerKnown = peerClock[origin] {
+                    if HlcComparator.compare(record.hlcTimestamp, peerKnown) == .orderedDescending {
+                        missing.append(record)
+                        if missing.count >= limit { break }
+                    }
+                } else {
+                    missing.append(record)
+                    if missing.count >= limit { break }
+                }
+            }
+
+            if batch.count < pageSize { break }
+            guard let maxHlc = batch.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })?.hlcTimestamp, maxHlc != cursor else { break }
+            cursor = maxHlc
+        }
+
+        return missing
     }
 
     public func applyChanges(_ changes: [ChangeRecord]) throws {
@@ -396,8 +502,8 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
             """
             let changelogSql = """
             INSERT INTO airdb_changelog 
-            (collection, id, type, payload, hlc_timestamp, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            (collection, id, type, payload, hlc_timestamp, physical_time, logical_counter, origin_node, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
 
             var selectStmt: OpaquePointer?
@@ -463,6 +569,11 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                 }
 
                 // 2. Append to changelog
+                let components = HlcComparator.parseHlcComponents(change.hlcTimestamp)
+                let physicalTime = components?.pt ?? 0
+                let logicalCounter = components?.lc ?? 0
+                let originNode = components?.node ?? ""
+
                 sqlite3_reset(changelogStmt)
                 sqlite3_clear_bindings(changelogStmt)
                 sqlite3_bind_text(changelogStmt, 1, change.collection, -1, sqliteTransient)
@@ -476,11 +587,15 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                     }
                 }
                 sqlite3_bind_text(changelogStmt, 5, change.hlcTimestamp, -1, sqliteTransient)
-                sqlite3_bind_int64(changelogStmt, 6, now)
+                sqlite3_bind_int64(changelogStmt, 6, physicalTime)
+                sqlite3_bind_int(changelogStmt, 7, Int32(logicalCounter))
+                sqlite3_bind_text(changelogStmt, 8, originNode, -1, sqliteTransient)
+                sqlite3_bind_int64(changelogStmt, 9, now)
 
                 if sqlite3_step(changelogStmt) != SQLITE_DONE {
                     throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
                 }
+                updateMaxSeenHlc(change.hlcTimestamp)
             }
 
             try executeSimple("COMMIT TRANSACTION;")
@@ -491,8 +606,15 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
     }
 
     public func getLatestHlc() throws -> String? {
+        if let cached = maxSeenHlc {
+            return cached
+        }
         guard let db = db else { throw SqliteError.databaseClosed }
-        let sql = "SELECT hlc_timestamp FROM airdb_changelog ORDER BY seq DESC LIMIT 1"
+        let sql = """
+        SELECT hlc_timestamp FROM airdb_changelog 
+        ORDER BY physical_time DESC, logical_counter DESC, origin_node DESC 
+        LIMIT 1;
+        """
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
 
@@ -500,10 +622,12 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
             throw SqliteError.prepareFailed(String(cString: sqlite3_errmsg(db)))
         }
 
+        var maxHlc: String?
         if sqlite3_step(stmt) == SQLITE_ROW {
-            return sqlite3_column_text(stmt, 0).flatMap { String(cString: $0) }
+            maxHlc = sqlite3_column_text(stmt, 0).flatMap({ String(cString: $0) })
         }
-        return nil
+        maxSeenHlc = maxHlc
+        return maxHlc
     }
 
     // MARK: - Query & Convenience API

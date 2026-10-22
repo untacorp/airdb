@@ -107,15 +107,30 @@ class SqliteDbAdapter(
                     type INTEGER NOT NULL,
                     payload BLOB NOT NULL,
                     hlc_timestamp TEXT NOT NULL,
+                    physical_time INTEGER NOT NULL DEFAULT 0,
+                    logical_counter INTEGER NOT NULL DEFAULT 0,
+                    origin_node TEXT NOT NULL DEFAULT '',
                     created_at INTEGER NOT NULL
                 );
                 """.trimIndent()
             )
 
+            // Safe migration for existing schemas
+            try { stmt.execute("ALTER TABLE airdb_changelog ADD COLUMN physical_time INTEGER NOT NULL DEFAULT 0;") } catch (_: Exception) {}
+            try { stmt.execute("ALTER TABLE airdb_changelog ADD COLUMN logical_counter INTEGER NOT NULL DEFAULT 0;") } catch (_: Exception) {}
+            try { stmt.execute("ALTER TABLE airdb_changelog ADD COLUMN origin_node TEXT NOT NULL DEFAULT '';") } catch (_: Exception) {}
+
             stmt.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_changelog_hlc 
                 ON airdb_changelog (hlc_timestamp);
+                """.trimIndent()
+            )
+
+            stmt.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_changelog_hlc_composite 
+                ON airdb_changelog (physical_time ASC, logical_counter ASC, origin_node ASC);
                 """.trimIndent()
             )
 
@@ -181,42 +196,80 @@ class SqliteDbAdapter(
     override suspend fun readChangelogSince(sinceHlcTimestamp: String?, limit: Int): List<ChangeRecord> = withContext(Dispatchers.IO) {
         mutex.withLock {
             val changes = mutableListOf<ChangeRecord>()
-            val sql = "SELECT collection, id, type, payload, hlc_timestamp FROM airdb_changelog ORDER BY seq ASC"
+            val parsedSince = sinceHlcTimestamp?.let { HlcComparator.parseHlcComponents(it) }
+
+            val sql = if (parsedSince == null) {
+                if (sinceHlcTimestamp != null) {
+                    "SELECT collection, id, type, payload, hlc_timestamp FROM airdb_changelog WHERE hlc_timestamp > ? ORDER BY physical_time ASC, logical_counter ASC, origin_node ASC, seq ASC LIMIT ?"
+                } else {
+                    "SELECT collection, id, type, payload, hlc_timestamp FROM airdb_changelog ORDER BY physical_time ASC, logical_counter ASC, origin_node ASC, seq ASC LIMIT ?"
+                }
+            } else {
+                """
+                SELECT collection, id, type, payload, hlc_timestamp 
+                FROM airdb_changelog 
+                WHERE (physical_time > ?) 
+                   OR (physical_time = ? AND logical_counter > ?) 
+                   OR (physical_time = ? AND logical_counter = ? AND origin_node > ?)
+                ORDER BY physical_time ASC, logical_counter ASC, origin_node ASC, seq ASC 
+                LIMIT ?
+                """.trimIndent()
+            }
+
             connection.prepareStatement(sql).use { stmt ->
+                if (parsedSince != null) {
+                    val (sincePhysicalTime, sinceLogicalCounter, sinceNodeId) = parsedSince
+                    stmt.setLong(1, sincePhysicalTime)
+                    stmt.setLong(2, sincePhysicalTime)
+                    stmt.setInt(3, sinceLogicalCounter)
+                    stmt.setLong(4, sincePhysicalTime)
+                    stmt.setInt(5, sinceLogicalCounter)
+                    stmt.setString(6, sinceNodeId)
+                    stmt.setInt(7, limit)
+                } else if (sinceHlcTimestamp != null) {
+                    stmt.setString(1, sinceHlcTimestamp)
+                    stmt.setInt(2, limit)
+                } else {
+                    stmt.setInt(1, limit)
+                }
+
                 stmt.executeQuery().use { rs ->
                     while (rs.next()) {
+                        val collection = rs.getString("collection")
+                        val id = rs.getString("id")
+                        val typeOrdinal = rs.getInt("type")
+                        val type = MutationType.entries.getOrElse(typeOrdinal) { MutationType.INSERT }
+                        val payload = rs.getBytes("payload") ?: ByteArray(0)
                         val hlc = rs.getString("hlc_timestamp")
-                        if (sinceHlcTimestamp == null || HlcComparator.compare(hlc, sinceHlcTimestamp) > 0) {
-                            val collection = rs.getString("collection")
-                            val id = rs.getString("id")
-                            val typeOrdinal = rs.getInt("type")
-                            val type = MutationType.entries.getOrElse(typeOrdinal) { MutationType.INSERT }
-                            val payload = rs.getBytes("payload") ?: ByteArray(0)
 
-                            changes.add(
-                                ChangeRecord(
-                                    id = id,
-                                    collection = collection,
-                                    type = type,
-                                    payload = payload,
-                                    hlcTimestamp = hlc
-                                )
+                        changes.add(
+                            ChangeRecord(
+                                id = id,
+                                collection = collection,
+                                type = type,
+                                payload = payload,
+                                hlcTimestamp = hlc
                             )
-                            if (changes.size >= limit) break
-                        }
+                        )
                     }
                 }
             }
+            changes.sortWith(Comparator.comparing({ it.hlcTimestamp }, HlcComparator))
             changes
         }
     }
 
     override suspend fun appendChangelog(record: ChangeRecord) = withContext(Dispatchers.IO) {
         mutex.withLock {
+            val components = HlcComparator.parseHlcComponents(record.hlcTimestamp)
+            val physicalTime = components?.first ?: 0L
+            val logicalCounter = components?.second ?: 0
+            val originNode = components?.third ?: ""
+
             val sql = """
                 INSERT INTO airdb_changelog 
-                (collection, id, type, payload, hlc_timestamp, created_at) 
-                VALUES (?, ?, ?, ?, ?, ?)
+                (collection, id, type, payload, hlc_timestamp, physical_time, logical_counter, origin_node, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent()
             connection.prepareStatement(sql).use { stmt ->
                 stmt.setString(1, record.collection)
@@ -224,8 +277,12 @@ class SqliteDbAdapter(
                 stmt.setInt(3, record.type.ordinal)
                 stmt.setBytes(4, record.payload)
                 stmt.setString(5, record.hlcTimestamp)
-                stmt.setLong(6, System.currentTimeMillis())
+                stmt.setLong(6, physicalTime)
+                stmt.setInt(7, logicalCounter)
+                stmt.setString(8, originNode)
+                stmt.setLong(9, System.currentTimeMillis())
                 stmt.executeUpdate()
+                updateMaxSeenHlc(record.hlcTimestamp)
             }
         }
         Unit
@@ -244,8 +301,8 @@ class SqliteDbAdapter(
                 """.trimIndent()
                 val changelogSql = """
                     INSERT INTO airdb_changelog 
-                    (collection, id, type, payload, hlc_timestamp, created_at) 
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    (collection, id, type, payload, hlc_timestamp, physical_time, logical_counter, origin_node, created_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """.trimIndent()
 
                 connection.prepareStatement(selectSql).use { selectStmt ->
@@ -261,6 +318,10 @@ class SqliteDbAdapter(
                                 // LWW check based on canonical HLC total order
                                 if (existingHlc == null || HlcComparator.compare(change.hlcTimestamp, existingHlc) > 0) {
                                     val now = System.currentTimeMillis()
+                                    val components = HlcComparator.parseHlcComponents(change.hlcTimestamp)
+                                    val physicalTime = components?.first ?: 0L
+                                    val logicalCounter = components?.second ?: 0
+                                    val originNode = components?.third ?: ""
 
                                     upsertStmt.setString(1, change.collection)
                                     upsertStmt.setString(2, change.id)
@@ -275,8 +336,12 @@ class SqliteDbAdapter(
                                     changelogStmt.setInt(3, change.type.ordinal)
                                     changelogStmt.setBytes(4, change.payload)
                                     changelogStmt.setString(5, change.hlcTimestamp)
-                                    changelogStmt.setLong(6, now)
+                                    changelogStmt.setLong(6, physicalTime)
+                                    changelogStmt.setInt(7, logicalCounter)
+                                    changelogStmt.setString(8, originNode)
+                                    changelogStmt.setLong(9, now)
                                     changelogStmt.executeUpdate()
+                                    updateMaxSeenHlc(change.hlcTimestamp)
                                 }
                             }
                         }
@@ -317,6 +382,22 @@ class SqliteDbAdapter(
                         deleteStmt.executeUpdate()
                     }
                 }
+            }
+
+            val thresholdComponents = HlcComparator.parseHlcComponents(pruneHlcThreshold)
+            val thresholdPt = thresholdComponents?.first ?: 0L
+            val thresholdLc = thresholdComponents?.second ?: 0
+
+            val deleteChangelogSql = """
+                DELETE FROM airdb_changelog 
+                WHERE type = ? AND (physical_time < ? OR (physical_time = ? AND logical_counter <= ?))
+            """.trimIndent()
+            connection.prepareStatement(deleteChangelogSql).use { deleteStmt ->
+                deleteStmt.setInt(1, MutationType.DELETE.ordinal)
+                deleteStmt.setLong(2, thresholdPt)
+                deleteStmt.setLong(3, thresholdPt)
+                deleteStmt.setInt(4, thresholdLc)
+                deleteStmt.executeUpdate()
             }
         }
         Unit

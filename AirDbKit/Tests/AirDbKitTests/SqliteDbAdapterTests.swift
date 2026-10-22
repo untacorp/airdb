@@ -221,4 +221,51 @@ final class SqliteDbAdapterTests: XCTestCase {
 
         await adapter.close()
     }
+
+    func testReadChangelogSinceNumericOrderingAndLimit() async throws {
+        let adapter = try SqliteDbAdapter.inMemory()
+
+        let rec1 = ChangeRecord(id: "rec-2", collection: "tests", type: .insert, payload: Data([1]), hlcTimestamp: "1000-2-nodeA")
+        let rec2 = ChangeRecord(id: "rec-10", collection: "tests", type: .insert, payload: Data([2]), hlcTimestamp: "1000-10-nodeA")
+        let rec3 = ChangeRecord(id: "rec-20", collection: "tests", type: .insert, payload: Data([3]), hlcTimestamp: "1000-20-nodeA")
+
+        try await adapter.applyChanges([rec1, rec2, rec3])
+
+        let changesSince2 = try await adapter.readChangelogSince(sinceHlcTimestamp: "1000-2-nodeA", limit: 10)
+        XCTAssertEqual(changesSince2.count, 2)
+        XCTAssertEqual(changesSince2[0].id, "rec-10")
+        XCTAssertEqual(changesSince2[1].id, "rec-20")
+
+        let limited = try await adapter.readChangelogSince(sinceHlcTimestamp: "1000-2-nodeA", limit: 1)
+        XCTAssertEqual(limited.count, 1)
+        XCTAssertEqual(limited[0].id, "rec-10")
+
+        await adapter.close()
+    }
+
+    func testLatestHlcDoesNotRegressOnOlderHistoricalSync() async throws {
+        let adapter = try SqliteDbAdapter.inMemory()
+
+        // Local record created at newer HLC (seq = 1)
+        let localRec = ChangeRecord(id: "local-1", collection: "docs", type: .insert, payload: Data([1]), hlcTimestamp: "1700000000000-0-nodeA")
+        try await adapter.applyChanges([localRec])
+        let hlc1 = try await adapter.getLatestHlc()
+        XCTAssertEqual(hlc1, "1700000000000-0-nodeA")
+
+        // Historical record synced from peer with older HLC (seq = 2)
+        let peerRec = ChangeRecord(id: "peer-historical", collection: "docs", type: .insert, payload: Data([2]), hlcTimestamp: "1600000000000-0-nodeB")
+        try await adapter.applyChanges([peerRec])
+
+        // getLatestHlc must not regress to peer-historical
+        let hlc2 = try await adapter.getLatestHlc()
+        XCTAssertEqual(hlc2, "1700000000000-0-nodeA")
+
+        // Higher logical counter must become latest
+        let counterRec = ChangeRecord(id: "local-2", collection: "docs", type: .insert, payload: Data([3]), hlcTimestamp: "1700000000000-10-nodeA")
+        try await adapter.applyChanges([counterRec])
+        let hlc3 = try await adapter.getLatestHlc()
+        XCTAssertEqual(hlc3, "1700000000000-10-nodeA")
+
+        await adapter.close()
+    }
 }

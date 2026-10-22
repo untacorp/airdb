@@ -78,12 +78,30 @@ public final class SimulatedTransport: AirDbTransport, @unchecked Sendable {
 
     private weak var listener: TransportListener?
     private let assemblyBuffer = AssemblyBuffer()
+    private var clusterKey: Data?
     private var isRunning: Bool = false
 
-    public init(nodeId: String, network: SimulatedNetwork, maxChunkSize: Int = 460) {
+    /// Initializes a simulated in-memory BLE transport node.
+    ///
+    /// - Parameters:
+    ///   - nodeId: Unique identifier for this local peer node.
+    ///   - network: Shared simulated network mesh coordinating peer delivery.
+    ///   - maxChunkSize: Maximum chunk size in bytes for packet fragmentation.
+    ///   - clusterKey: Optional 256-bit symmetric encryption key for ChaCha20-Poly1305 AEAD framing.
+    public init(nodeId: String, network: SimulatedNetwork, maxChunkSize: Int = 460, clusterKey: Data? = nil) {
         self.nodeId = nodeId
         self.network = network
         self.maxChunkSize = maxChunkSize
+        self.clusterKey = clusterKey
+    }
+
+    /// Sets or updates the cluster encryption key for wire framing on this simulated transport.
+    ///
+    /// - Parameter key: 256-bit symmetric cluster key, or nil for unencrypted packets.
+    public func setClusterKey(_ key: Data?) {
+        lock.withScopedLock {
+            self.clusterKey = key
+        }
     }
 
     public func start() {
@@ -101,12 +119,29 @@ public final class SimulatedTransport: AirDbTransport, @unchecked Sendable {
     }
 
     public func send(packet: AirDbPacket, targetPeerId: String?) async -> Bool {
-        let running = lock.withScopedLock { isRunning }
+        let (running, key) = lock.withScopedLock { (isRunning, clusterKey) }
         guard running else { return false }
 
-        let fragments = PacketFragmenter.fragment(packet: packet, maxChunkSize: maxChunkSize)
+        let fragments = PacketFragmenter.fragment(packet: packet, clusterKey: key, maxChunkSize: maxChunkSize)
         for fragment in fragments {
-            network.dispatch(senderNodeId: nodeId, packet: fragment, targetPeerId: targetPeerId)
+            let wirePacket: AirDbPacket
+            if let key = key, fragment.type != .fragment {
+                let encoded = BinaryCodec.encode(fragment, clusterKey: key)
+                let headerSize = BinaryCodec.minHeaderSize + (fragment.recipientId != nil ? BinaryCodec.recipientIdSize : 0)
+                let ciphertext = encoded.subdata(in: headerSize..<encoded.count)
+                wirePacket = AirDbPacket(
+                    version: fragment.version,
+                    type: fragment.type,
+                    flags: fragment.flags | PacketFlags.encrypted,
+                    timestamp: fragment.timestamp,
+                    senderId: fragment.senderId,
+                    recipientId: fragment.recipientId,
+                    payload: ciphertext
+                )
+            } else {
+                wirePacket = fragment
+            }
+            network.dispatch(senderNodeId: nodeId, packet: wirePacket, targetPeerId: targetPeerId)
         }
         return true
     }
@@ -118,20 +153,29 @@ public final class SimulatedTransport: AirDbTransport, @unchecked Sendable {
     }
 
     internal func deliver(senderNodeId: String, rawPacket: AirDbPacket) {
-        let (currentListener, running) = lock.withScopedLock {
-            (self.listener, self.isRunning)
+        let (currentListener, running, key) = lock.withScopedLock {
+            (self.listener, self.isRunning, self.clusterKey)
         }
 
         guard running, let listener = currentListener else { return }
 
         let packet: AirDbPacket
         if rawPacket.type == .fragment {
-            guard let reassembled = assemblyBuffer.ingest(packet: rawPacket) else {
+            guard let reassembled = assemblyBuffer.ingest(rawPacket, clusterKey: key) else {
                 return
             }
             packet = reassembled
+        } else if rawPacket.isEncrypted {
+            guard let key = key else { return }
+            let wireData = BinaryCodec.encode(rawPacket, clusterKey: nil)
+            guard let decrypted = BinaryCodec.decode(wireData, clusterKey: key) else { return }
+            packet = decrypted
         } else {
             packet = rawPacket
+        }
+
+        if key != nil && !packet.isEncrypted {
+            return
         }
 
         listener.onTransportEvent(

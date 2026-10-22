@@ -25,6 +25,17 @@ import java.util.zip.Inflater
  */
 object Compression {
 
+    /**
+     * Maximum decompressed size threshold (64 KB) to mitigate zip-bomb attacks over the BLE mesh.
+     */
+    const val MAX_DECOMPRESSED_SIZE = 65535
+
+    /**
+     * Compresses the raw input byte array using Deflate with best compression level.
+     *
+     * @param input Raw uncompressed bytes.
+     * @return Deflated byte array.
+     */
     fun compress(input: ByteArray): ByteArray {
         val deflater = Deflater(Deflater.BEST_COMPRESSION)
         deflater.setInput(input)
@@ -40,17 +51,35 @@ object Compression {
         return outputStream.toByteArray()
     }
 
-    fun decompress(input: ByteArray): ByteArray {
+    /**
+     * Decompresses Deflate-compressed bytes while strictly enforcing a maximum size threshold.
+     *
+     * @param input Deflated byte array.
+     * @param maxDecompressedSize Maximum allowable size of the decompressed output in bytes.
+     * @return Inflated raw byte array.
+     * @throws IllegalArgumentException If decompressed payload exceeds [maxDecompressedSize].
+     */
+    fun decompress(input: ByteArray, maxDecompressedSize: Int = MAX_DECOMPRESSED_SIZE): ByteArray {
         val inflater = Inflater()
         inflater.setInput(input)
 
-        val outputStream = ByteArrayOutputStream(input.size * 2)
+        val outputStream = ByteArrayOutputStream(minOf(input.size * 2, maxDecompressedSize))
         val buffer = ByteArray(1024)
-        while (!inflater.finished()) {
-            val count = inflater.inflate(buffer)
-            outputStream.write(buffer, 0, count)
+        var totalInflated = 0
+
+        try {
+            while (!inflater.finished()) {
+                val count = inflater.inflate(buffer)
+                if (count == 0 && inflater.needsInput()) break
+                totalInflated += count
+                if (totalInflated > maxDecompressedSize) {
+                    throw IllegalArgumentException("Decompressed payload exceeds max allowed size of $maxDecompressedSize bytes")
+                }
+                outputStream.write(buffer, 0, count)
+            }
+        } finally {
+            inflater.end()
         }
-        inflater.end()
         return outputStream.toByteArray()
     }
 }

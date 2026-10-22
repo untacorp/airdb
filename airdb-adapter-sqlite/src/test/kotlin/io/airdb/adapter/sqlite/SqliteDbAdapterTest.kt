@@ -142,9 +142,11 @@ class SqliteDbAdapterTest {
             // Compact tombstones older than threshold 1000-6-nodeA
             adapter.compact(pruneHlcThreshold = "1000-6-nodeA")
 
-            // After compaction, tombstone is purged completely from disk
+            // After compaction, tombstone is purged completely from disk and changelog
             assertFalse(adapter.isRecordDeleted("patients", "patient-007"))
             assertNull(adapter.readEntity("patients", "patient-007"))
+            val changelog = adapter.readChangelogSince(null, 100)
+            assertFalse(changelog.any { it.id == "patient-007" && it.type == MutationType.DELETE })
         }
     }
 
@@ -166,6 +168,63 @@ class SqliteDbAdapterTest {
             assertEquals(2, missing.size)
             assertTrue(missing.any { it.id == "e-2" })
             assertTrue(missing.any { it.id == "e-3" })
+        }
+    }
+
+    @Test
+    fun testReadChangelogSinceNumericOrderingAndLimit() = runBlocking {
+        SqliteDbAdapter.inMemory().use { adapter ->
+            // In ASCII sorting, "1000-10-nodeA" is smaller than "1000-2-nodeA"
+            // But in canonical HLC numeric ordering, 10 > 2.
+            adapter.applyChanges(
+                listOf(
+                    ChangeRecord("rec-2", "tests", MutationType.INSERT, byteArrayOf(1), "1000-2-nodeA"),
+                    ChangeRecord("rec-10", "tests", MutationType.INSERT, byteArrayOf(2), "1000-10-nodeA"),
+                    ChangeRecord("rec-20", "tests", MutationType.INSERT, byteArrayOf(3), "1000-20-nodeA")
+                )
+            )
+
+            // Reading since "1000-2-nodeA" must return rec-10 and rec-20 via SQL range scan
+            val changesSince2 = adapter.readChangelogSince("1000-2-nodeA", limit = 10)
+            assertEquals(2, changesSince2.size)
+            assertEquals("rec-10", changesSince2[0].id)
+            assertEquals("rec-20", changesSince2[1].id)
+
+            // Test strict limit
+            val limited = adapter.readChangelogSince("1000-2-nodeA", limit = 1)
+            assertEquals(1, limited.size)
+            assertEquals("rec-10", limited[0].id)
+        }
+    }
+
+    @Test
+    fun testLatestHlcDoesNotRegressOnOlderHistoricalSync() = runBlocking {
+        SqliteDbAdapter.inMemory().use { adapter ->
+            // Local record created at newer HLC (seq = 1)
+            adapter.applyChanges(
+                listOf(
+                    ChangeRecord("local-1", "docs", MutationType.INSERT, "v1".toByteArray(), "1700000000000-0-nodeA")
+                )
+            )
+            assertEquals("1700000000000-0-nodeA", adapter.getLatestHlc())
+
+            // Historical record synced from peer with older HLC (seq = 2)
+            adapter.applyChanges(
+                listOf(
+                    ChangeRecord("peer-historical", "docs", MutationType.INSERT, "v0".toByteArray(), "1600000000000-0-nodeB")
+                )
+            )
+
+            // getLatestHlc MUST NOT regress to the older timestamp just because it was inserted later (seq = 2)
+            assertEquals("1700000000000-0-nodeA", adapter.getLatestHlc())
+
+            // And counter ordering must be respected
+            adapter.applyChanges(
+                listOf(
+                    ChangeRecord("local-2", "docs", MutationType.INSERT, "v2".toByteArray(), "1700000000000-10-nodeA")
+                )
+            )
+            assertEquals("1700000000000-10-nodeA", adapter.getLatestHlc())
         }
     }
 }

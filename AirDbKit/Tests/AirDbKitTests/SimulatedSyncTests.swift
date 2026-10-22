@@ -86,4 +86,77 @@ final class SimulatedSyncTests: XCTestCase {
         engineA.stop()
         engineB.stop()
     }
+
+    func testEncryptedMeshReplicationConvergence() async throws {
+        let network = SimulatedNetwork()
+        let clusterKey = Data(repeating: 0xEE, count: 32)
+
+        let adapterA = MemoryDbAdapter()
+        let transportA = SimulatedTransport(nodeId: "node-enc-a", network: network)
+        let engineA = AirDbEngine(nodeName: "node-enc-a", adapter: adapterA, transport: transportA, clusterKey: clusterKey)
+
+        let adapterB = MemoryDbAdapter()
+        let transportB = SimulatedTransport(nodeId: "node-enc-b", network: network)
+        let engineB = AirDbEngine(nodeName: "node-enc-b", adapter: adapterB, transport: transportB, clusterKey: clusterKey)
+
+        _ = try await engineA.saveRecord(
+            collection: "patients",
+            id: "p-enc-001",
+            type: .insert,
+            payload: Data("{\"name\": \"Secret Survivor\"}".utf8)
+        )
+
+        engineA.start()
+        engineB.start()
+
+        let deadline = Date().addingTimeInterval(2.0)
+        var converged = false
+
+        while Date() < deadline {
+            let record = await adapterB.getRecord(collection: "patients", id: "p-enc-001")
+            if record != nil {
+                converged = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+
+        XCTAssertTrue(converged, "Encrypted record should replicate across clusterKey-authenticated nodes")
+
+        engineA.stop()
+        engineB.stop()
+    }
+
+    func testSyncSessionQueueProcessingAndStop() async throws {
+        let network = SimulatedNetwork()
+        let adapter = MemoryDbAdapter()
+        let transport = SimulatedTransport(nodeId: "node-test", network: network)
+        let clock = HybridLogicalClock(nodeId: "node-test")
+        let vc = VectorClock()
+
+        let session = SyncSession(
+            peerId: "remote-peer",
+            linkId: "link-1",
+            localNodeId: 101,
+            localNodeName: "node-test",
+            adapter: adapter,
+            clock: clock,
+            vectorClock: vc,
+            transport: transport
+        ) { _, _ in }
+
+        // Enqueue handshake packets in FIFO order
+        let handshakePacket = AirDbPacket(
+            type: .handshake,
+            senderId: 202,
+            payload: Data("remote-peer".utf8)
+        )
+        session.enqueue(packet: handshakePacket)
+
+        // Give the sequential queue processor time to execute
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        // Stopping the session cleanly finishes stream and cancels background task
+        session.stop()
+    }
 }

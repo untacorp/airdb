@@ -82,12 +82,17 @@ class SimulatedNetwork(
 class SimulatedTransport(
     val nodeId: String,
     private val network: SimulatedNetwork,
-    private val maxChunkSize: Int = 460
+    private val maxChunkSize: Int = 460,
+    private var clusterKey: ByteArray? = null
 ) : AirDbTransport {
 
     private var listener: TransportListener? = null
     private val assemblyBuffer = AssemblyBuffer()
     private var isRunning = false
+
+    override fun setClusterKey(key: ByteArray?) {
+        this.clusterKey = key
+    }
 
     override fun start() {
         isRunning = true
@@ -103,9 +108,25 @@ class SimulatedTransport(
         if (!isRunning) return false
 
         // Emulate MTU fragmentation
-        val fragments = PacketFragmenter.fragment(packet, maxChunkSize = maxChunkSize)
+        val fragments = PacketFragmenter.fragment(packet, clusterKey = clusterKey, maxChunkSize = maxChunkSize)
         for (fragment in fragments) {
-            network.dispatch(nodeId, fragment, targetPeerId)
+            val wirePacket = if (clusterKey != null && fragment.type != PacketType.FRAGMENT) {
+                val encoded = BinaryCodec.encode(fragment, clusterKey = clusterKey)
+                val headerSize = BinaryCodec.MIN_HEADER_SIZE + (if (fragment.recipientId != null) BinaryCodec.RECIPIENT_ID_SIZE else 0)
+                val ciphertext = encoded.copyOfRange(headerSize, encoded.size)
+                AirDbPacket(
+                    version = fragment.version,
+                    type = fragment.type,
+                    flags = (fragment.flags.toInt() or io.airdb.protocol.packet.PacketFlags.FLAG_ENCRYPTED.toInt()).toByte(),
+                    timestamp = fragment.timestamp,
+                    senderId = fragment.senderId,
+                    recipientId = fragment.recipientId,
+                    payload = ciphertext
+                )
+            } else {
+                fragment
+            }
+            network.dispatch(nodeId, wirePacket, targetPeerId)
         }
         return true
     }
@@ -118,9 +139,17 @@ class SimulatedTransport(
         if (!isRunning) return
 
         val packet = if (rawPacket.type == PacketType.FRAGMENT) {
-            assemblyBuffer.ingest(rawPacket) ?: return
+            assemblyBuffer.ingest(rawPacket, clusterKey = clusterKey) ?: return
+        } else if (rawPacket.isEncrypted) {
+            if (clusterKey == null) return
+            val wireBytes = BinaryCodec.encode(rawPacket, clusterKey = null)
+            BinaryCodec.decode(wireBytes, clusterKey = clusterKey) ?: return
         } else {
             rawPacket
+        }
+
+        if (clusterKey != null && !packet.isEncrypted) {
+            return
         }
 
         listener?.onTransportEvent(

@@ -65,6 +65,13 @@ class AndroidBleTransport(
     private var listener: TransportListener? = null
     private val isRunning = AtomicBoolean(false)
 
+    @Volatile
+    private var clusterKey: ByteArray? = config.clusterKey
+
+    override fun setClusterKey(key: ByteArray?) {
+        this.clusterKey = key
+    }
+
     // Central (Client) role state
     private var scanner: BluetoothLeScanner? = null
     private val activeGattClients = ConcurrentHashMap<String, BluetoothGatt>()
@@ -125,11 +132,16 @@ class AndroidBleTransport(
     override suspend fun send(packet: AirDbPacket, targetPeerId: String?): Boolean {
         if (!isRunning.get()) return false
 
-        val fragments = PacketFragmenter.fragment(packet, maxChunkSize = config.maxFragmentChunkSize)
+        val key = clusterKey
+        val fragments = PacketFragmenter.fragment(packet, clusterKey = key, maxChunkSize = config.maxFragmentChunkSize)
         var anyEnqueued = false
 
         for (fragment in fragments) {
-            val encoded = BinaryCodec.encode(fragment)
+            val encoded = if (fragment.type == PacketType.FRAGMENT) {
+                BinaryCodec.encode(fragment)
+            } else {
+                BinaryCodec.encode(fragment, clusterKey = key)
+            }
 
             // 1. Transmit via active GATT Client connections (to discovered Peripherals)
             for ((address, gatt) in activeGattClients) {
@@ -417,13 +429,18 @@ class AndroidBleTransport(
     // MARK: - Inbound Ingestion & Reassembly
 
     private fun handleInboundBytes(data: ByteArray, peerId: String, linkId: String) {
-        val rawPacket = BinaryCodec.decode(data) ?: return
+        val key = clusterKey
+        val rawPacket = BinaryCodec.decode(data, clusterKey = key) ?: return
 
         val packetToDeliver = if (rawPacket.type == PacketType.FRAGMENT) {
             val buffer = assemblyBuffers.computeIfAbsent(linkId) { AssemblyBuffer() }
-            buffer.ingest(rawPacket) ?: return
+            buffer.ingest(rawPacket, clusterKey = key) ?: return
         } else {
             rawPacket
+        }
+
+        if (key != null && !packetToDeliver.isEncrypted) {
+            return
         }
 
         listener?.onTransportEvent(

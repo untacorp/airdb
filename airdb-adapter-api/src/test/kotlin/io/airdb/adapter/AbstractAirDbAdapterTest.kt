@@ -117,4 +117,27 @@ class AbstractAirDbAdapterTest {
         assertTrue(missing.any { it.id == "doc-2" }) // 1005 > 1000
         assertTrue(missing.any { it.id == "doc-3" }) // nodeB unknown to peer
     }
+
+    @Test
+    fun testDataStarvationPaginationBeyondLimit() = runBlocking {
+        val adapter = MockCustomStoreAdapter()
+
+        // Create 250 records from nodeA (HLC: 1000-0-nodeA to 1000-249-nodeA)
+        val initialBatch = (0 until 250).map { i ->
+            ChangeRecord("doc-$i", "items", MutationType.INSERT, "v".toByteArray(), "1000-$i-nodeA")
+        }
+        adapter.applyChanges(initialBatch)
+
+        // Peer already knows up to record 199 (HLC 1000-199-nodeA)
+        val peerClock = mapOf("nodeA" to "1000-199-nodeA")
+
+        // With small limit of 20, the old implementation would read 0..39 (null, limit = 40),
+        // find that all 40 are <= 199, and return EMPTY LIST (data starvation).
+        // The fixed implementation pages through until it finds records 200..219.
+        val missing = adapter.getMissingChanges(peerClock, limit = 20)
+
+        assertEquals(20, missing.size, "Must page past older records to find new changes")
+        assertEquals("doc-200", missing.first().id)
+        assertEquals("doc-219", missing.last().id)
+    }
 }

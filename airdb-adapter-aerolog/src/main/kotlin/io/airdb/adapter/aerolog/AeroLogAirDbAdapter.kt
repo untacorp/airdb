@@ -93,17 +93,30 @@ class AeroLogAirDbAdapter(
 
     override suspend fun readChangelogSince(sinceHlcTimestamp: String?, limit: Int): List<ChangeRecord> = withContext(Dispatchers.IO) {
         mutex.withLock {
-            val fetchCount = limit.coerceAtLeast(100).toUInt()
-            val entries = changelogStream.readRecent(fetchCount)
-            val changes = entries.map { entry ->
-                deserializeChangeRecord(entry.payload)
+            val total = changelogStream.totalEntries()
+            if (total == 0UL || limit <= 0) {
+                return@withContext emptyList()
             }
 
-            if (sinceHlcTimestamp == null) {
-                changes.take(limit)
-            } else {
-                changes.filter { HlcComparator.compare(it.hlcTimestamp, sinceHlcTimestamp) > 0 }.take(limit)
+            // Read stream chronologically up to a safety ceiling to prevent JVM heap exhaustion.
+            // Note: Upstream AeroLog UniFFI currently provides tail-relative `readRecent(limit)`.
+            // When native sequential range queries are exposed in Rust FFI, this can be streamed.
+            val maxFetchCeiling = 10_000UL
+            val fetchCount = total.coerceAtMost(maxFetchCeiling).toUInt()
+            val entries = changelogStream.readRecent(fetchCount)
+            val result = ArrayList<ChangeRecord>(limit.coerceAtMost(entries.size))
+
+            for (entry in entries) {
+                val change = deserializeChangeRecord(entry.payload)
+                if (sinceHlcTimestamp == null || HlcComparator.compare(change.hlcTimestamp, sinceHlcTimestamp) > 0) {
+                    result.add(change)
+                    if (result.size >= limit) {
+                        break
+                    }
+                }
             }
+
+            result
         }
     }
 

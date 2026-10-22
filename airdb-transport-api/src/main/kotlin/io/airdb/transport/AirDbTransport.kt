@@ -72,4 +72,10 @@ interface AirDbTransport {
 
     /** Set event listener for inbound packets and link state updates. */
     fun setListener(listener: TransportListener)
+
+    /**
+     * Configures the symmetric AEAD cluster key for encrypting outbound packets
+     * and authenticating/decrypting inbound packets.
+     */
+    fun setClusterKey(key: ByteArray?) {}
 }

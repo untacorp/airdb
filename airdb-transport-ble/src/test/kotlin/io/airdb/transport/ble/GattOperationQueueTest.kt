@@ -77,4 +77,80 @@ class GattOperationQueueTest {
         // Queue should now be empty
         assertEquals(0, queue.pendingCount("link-1"))
     }
+
+    @Test
+    fun testFailingExecutionDropsAfterMaxRetries() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        val testScope = TestScope(testDispatcher)
+
+        val queue = GattOperationQueue(testScope, retryDelayMs = 10L, maxRetries = 2)
+        val op1Attempts = AtomicInteger(0)
+        val op2Attempts = AtomicInteger(0)
+
+        // Op 1 always fails in execute()
+        queue.enqueue("link-1", byteArrayOf(1), false) {
+            op1Attempts.incrementAndGet()
+            false
+        }
+
+        // Op 2 succeeds in execute()
+        queue.enqueue("link-1", byteArrayOf(2), false) {
+            op2Attempts.incrementAndGet()
+            true
+        }
+
+        // Initially attempt 1 for Op 1
+        assertEquals(1, op1Attempts.get())
+        assertEquals(0, op2Attempts.get())
+
+        // Advance time to trigger retry 1
+        testScheduler.advanceTimeBy(15L)
+        assertEquals(2, op1Attempts.get())
+        assertEquals(0, op2Attempts.get())
+
+        // Advance time to trigger retry 2 (which reaches maxRetries = 2)
+        testScheduler.advanceTimeBy(15L)
+        assertEquals(3, op1Attempts.get())
+
+        // Now Op 1 must be dropped and Op 2 dispatched immediately
+        assertEquals(1, op2Attempts.get(), "Op 2 should be dispatched after Op 1 exhausts retries")
+        assertEquals(1, queue.pendingCount("link-1"))
+    }
+
+    @Test
+    fun testWatchdogTimeoutUnfreezesQueueWhenCallbackNeverFires() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        val testScope = TestScope(testDispatcher)
+
+        // Queue with 50ms operation timeout and 0 retries
+        val queue = GattOperationQueue(testScope, retryDelayMs = 10L, maxRetries = 0, operationTimeoutMs = 50L)
+        val executedOps = mutableListOf<Int>()
+
+        // Op 1 accepts but driver silently drops callback
+        queue.enqueue("link-1", byteArrayOf(1), false) {
+            executedOps.add(1)
+            true
+        }
+
+        // Op 2 queued behind Op 1
+        queue.enqueue("link-1", byteArrayOf(2), false) {
+            executedOps.add(2)
+            true
+        }
+
+        // Op 1 dispatched, Op 2 waiting
+        assertEquals(listOf(1), executedOps)
+        assertEquals(2, queue.pendingCount("link-1"))
+
+        // Advance time by 49ms (watchdog has not fired yet)
+        testScheduler.advanceTimeBy(49L)
+        assertEquals(listOf(1), executedOps)
+
+        // Advance time past 50ms watchdog timeout
+        testScheduler.advanceTimeBy(2L)
+
+        // Watchdog fires, completes Op 1 with failure (retries exhausted), and dispatches Op 2!
+        assertEquals(listOf(1, 2), executedOps, "Op 2 must be dispatched after Op 1 times out")
+        assertEquals(1, queue.pendingCount("link-1"))
+    }
 }

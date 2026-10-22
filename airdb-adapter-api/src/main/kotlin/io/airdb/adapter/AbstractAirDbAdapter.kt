@@ -101,12 +101,33 @@ abstract class AbstractAirDbAdapter : AirDbAdapter {
     }
 
     override suspend fun getMissingChanges(peerClock: Map<String, String>, limit: Int): List<ChangeRecord> {
-        return readChangelogSince(null, limit = limit * 2).filter { record ->
-            val origin = HlcComparator.extractNodeId(record.hlcTimestamp) ?: ""
-            val peerKnown = peerClock[origin]
-            peerKnown == null || HlcComparator.compare(record.hlcTimestamp, peerKnown) > 0
-        }.take(limit)
+        val missing = ArrayList<ChangeRecord>(limit)
+        var cursor: String? = null
+        val pageSize = maxOf(limit, 100)
+
+        while (missing.size < limit) {
+            val batch = readChangelogSince(cursor, limit = pageSize)
+            if (batch.isEmpty()) break
+
+            for (record in batch) {
+                val origin = HlcComparator.extractNodeId(record.hlcTimestamp) ?: ""
+                val peerKnown = peerClock[origin]
+                if (peerKnown == null || HlcComparator.compare(record.hlcTimestamp, peerKnown) > 0) {
+                    missing.add(record)
+                    if (missing.size >= limit) break
+                }
+            }
+
+            if (batch.size < pageSize) break
+            val maxHlc = batch.maxOfWith(HlcComparator) { it.hlcTimestamp }
+            if (maxHlc == cursor) break
+            cursor = maxHlc
+        }
+        return missing
     }
+
+    @Volatile
+    private var maxSeenHlc: String? = null
 
     override suspend fun applyChanges(changes: List<ChangeRecord>) {
         executeInTransaction {
@@ -124,15 +145,39 @@ abstract class AbstractAirDbAdapter : AirDbAdapter {
                     )
                     writeEntity(entity)
                     appendChangelog(change)
+                    updateMaxSeenHlc(change.hlcTimestamp)
                 }
             }
         }
     }
 
+    protected fun updateMaxSeenHlc(hlc: String) {
+        val current = maxSeenHlc
+        if (current == null || HlcComparator.compare(hlc, current) > 0) {
+            maxSeenHlc = hlc
+        }
+    }
+
     override suspend fun getLatestHlc(): String? {
-        val latest = readChangelogSince(null, limit = 1000)
-            .maxWithOrNull(Comparator.comparing({ it.hlcTimestamp }, HlcComparator))
-        return latest?.hlcTimestamp
+        val cached = maxSeenHlc
+        if (cached != null) return cached
+
+        var cursor: String? = null
+        var maxHlc: String? = null
+        val pageSize = 1000
+        while (true) {
+            val batch = readChangelogSince(cursor, limit = pageSize)
+            if (batch.isEmpty()) break
+            for (record in batch) {
+                if (maxHlc == null || HlcComparator.compare(record.hlcTimestamp, maxHlc) > 0) {
+                    maxHlc = record.hlcTimestamp
+                }
+            }
+            if (batch.size < pageSize) break
+            cursor = batch.last().hlcTimestamp
+        }
+        maxSeenHlc = maxHlc
+        return maxHlc
     }
 
     /**

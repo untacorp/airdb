@@ -78,4 +78,28 @@ class LiveMutationSyncTest {
         engineA.stop()
         engineB.stop()
     }
+
+    @Test
+    fun testEngineRestartLifecycle() = runBlocking {
+        val network = SimulatedNetwork()
+        val adapter = MemoryDbAdapter()
+        val transport = SimulatedTransport("node-restart", network)
+        val engine = AirDbEngine("node-restart", adapter, transport)
+
+        engine.start()
+        engine.stop()
+
+        // Restarting engine should succeed and allow saving records and processing coroutines
+        engine.start()
+        val record = engine.saveRecord(
+            collection = "triage",
+            id = "triage-restart-01",
+            type = MutationType.INSERT,
+            payload = "restarted".toByteArray()
+        )
+        assertNotNull(record)
+        assertEquals("triage-restart-01", record.id)
+
+        engine.stop()
+    }
 }
