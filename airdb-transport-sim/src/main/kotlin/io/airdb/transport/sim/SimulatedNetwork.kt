@@ -142,24 +142,8 @@ class SimulatedTransport(
             assemblyBuffer.ingest(rawPacket, clusterKey = clusterKey) ?: return
         } else if (rawPacket.isEncrypted) {
             if (clusterKey == null) return
-            val headerSize = BinaryCodec.MIN_HEADER_SIZE + (if (rawPacket.recipientId != null) BinaryCodec.RECIPIENT_ID_SIZE else 0)
-            val fullBytes = java.nio.ByteBuffer.allocate(headerSize + rawPacket.payload.size).apply {
-                order(java.nio.ByteOrder.BIG_ENDIAN)
-                put(BinaryCodec.MAGIC_BYTE_0)
-                put(BinaryCodec.MAGIC_BYTE_1)
-                put(rawPacket.version)
-                put(rawPacket.type.code)
-                put(rawPacket.flags)
-                putLong(rawPacket.timestamp)
-                putShort(rawPacket.payload.size.toShort())
-                putLong(rawPacket.senderId)
-                val recipientId = rawPacket.recipientId
-                if (recipientId != null) {
-                    putLong(recipientId)
-                }
-                put(rawPacket.payload)
-            }.array()
-            BinaryCodec.decode(fullBytes, clusterKey = clusterKey) ?: return
+            val wireBytes = BinaryCodec.encode(rawPacket, clusterKey = null)
+            BinaryCodec.decode(wireBytes, clusterKey = clusterKey) ?: return
         } else {
             rawPacket
         }

@@ -167,26 +167,8 @@ public final class SimulatedTransport: AirDbTransport, @unchecked Sendable {
             packet = reassembled
         } else if rawPacket.isEncrypted {
             guard let key = key else { return }
-            var fullData = Data()
-            fullData.append(BinaryCodec.magicByte0)
-            fullData.append(BinaryCodec.magicByte1)
-            fullData.append(rawPacket.version)
-            fullData.append(rawPacket.type.rawValue)
-            fullData.append(rawPacket.flags)
-            var ts = rawPacket.timestamp.bigEndian
-            fullData.append(Data(bytes: &ts, count: 8))
-            var pLen = UInt16(rawPacket.payload.count).bigEndian
-            fullData.append(Data(bytes: &pLen, count: 2))
-            var sId = rawPacket.senderId.bigEndian
-            fullData.append(Data(bytes: &sId, count: 8))
-            if let rId = rawPacket.recipientId {
-                var rIdBe = rId.bigEndian
-                fullData.append(Data(bytes: &rIdBe, count: 8))
-            }
-            fullData.append(rawPacket.payload)
-            guard let decrypted = BinaryCodec.decode(fullData, clusterKey: key) else {
-                return
-            }
+            let wireData = BinaryCodec.encode(rawPacket, clusterKey: nil)
+            guard let decrypted = BinaryCodec.decode(wireData, clusterKey: key) else { return }
             packet = decrypted
         } else {
             packet = rawPacket
