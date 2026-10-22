@@ -107,16 +107,35 @@ class GattOperationQueue(
     }
 
     private fun scheduleRetry(linkId: String) {
+        var startNextImmediately = false
         val doSchedule = synchronized(lock) {
             val state = linkStates[linkId] ?: return
             state.inFlight = false
-            if (state.retryScheduled || state.pending.isEmpty()) false else {
-                state.retryScheduled = true
-                true
+            val head = state.pending.peekFirst() ?: return
+
+            if (head.retryCount < maxRetries) {
+                head.retryCount++
+                if (state.retryScheduled) false else {
+                    state.retryScheduled = true
+                    true
+                }
+            } else {
+                // Operation exhausted all retries, drop it to prevent infinite loop
+                state.pending.pollFirst()
+                state.pendingBytes -= head.data.size
+                if (state.pending.isNotEmpty()) {
+                    state.inFlight = true
+                    startNextImmediately = true
+                } else {
+                    linkStates.remove(linkId)
+                }
+                false
             }
         }
 
-        if (doSchedule) {
+        if (startNextImmediately) {
+            dispatchHead(linkId)
+        } else if (doSchedule) {
             scope.launch {
                 delay(retryDelayMs)
                 val canStart = synchronized(lock) {
