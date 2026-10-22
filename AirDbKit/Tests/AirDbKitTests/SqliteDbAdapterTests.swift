@@ -268,7 +268,4 @@ final class SqliteDbAdapterTests: XCTestCase {
 
         await adapter.close()
     }
-
-        await adapter.close()
-    }
 }

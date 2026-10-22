@@ -159,5 +159,4 @@ final class SimulatedSyncTests: XCTestCase {
         // Stopping the session cleanly finishes stream and cancels background task
         session.stop()
     }
-    }
 }
