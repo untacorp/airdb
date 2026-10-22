@@ -218,13 +218,13 @@ class SqliteDbAdapter(
 
             connection.prepareStatement(sql).use { stmt ->
                 if (parsedSince != null) {
-                    val (pt, lc, node) = parsedSince
-                    stmt.setLong(1, pt)
-                    stmt.setLong(2, pt)
-                    stmt.setInt(3, lc)
-                    stmt.setLong(4, pt)
-                    stmt.setInt(5, lc)
-                    stmt.setString(6, node)
+                    val (sincePhysicalTime, sinceLogicalCounter, sinceNodeId) = parsedSince
+                    stmt.setLong(1, sincePhysicalTime)
+                    stmt.setLong(2, sincePhysicalTime)
+                    stmt.setInt(3, sinceLogicalCounter)
+                    stmt.setLong(4, sincePhysicalTime)
+                    stmt.setInt(5, sinceLogicalCounter)
+                    stmt.setString(6, sinceNodeId)
                     stmt.setInt(7, limit)
                 } else if (sinceHlcTimestamp != null) {
                     stmt.setString(1, sinceHlcTimestamp)
@@ -262,9 +262,9 @@ class SqliteDbAdapter(
     override suspend fun appendChangelog(record: ChangeRecord) = withContext(Dispatchers.IO) {
         mutex.withLock {
             val components = HlcComparator.parseHlcComponents(record.hlcTimestamp)
-            val pt = components?.first ?: 0L
-            val lc = components?.second ?: 0
-            val node = components?.third ?: ""
+            val physicalTime = components?.first ?: 0L
+            val logicalCounter = components?.second ?: 0
+            val originNode = components?.third ?: ""
 
             val sql = """
                 INSERT INTO airdb_changelog 
@@ -277,9 +277,9 @@ class SqliteDbAdapter(
                 stmt.setInt(3, record.type.ordinal)
                 stmt.setBytes(4, record.payload)
                 stmt.setString(5, record.hlcTimestamp)
-                stmt.setLong(6, pt)
-                stmt.setInt(7, lc)
-                stmt.setString(8, node)
+                stmt.setLong(6, physicalTime)
+                stmt.setInt(7, logicalCounter)
+                stmt.setString(8, originNode)
                 stmt.setLong(9, System.currentTimeMillis())
                 stmt.executeUpdate()
                 updateMaxSeenHlc(record.hlcTimestamp)
@@ -319,9 +319,9 @@ class SqliteDbAdapter(
                                 if (existingHlc == null || HlcComparator.compare(change.hlcTimestamp, existingHlc) > 0) {
                                     val now = System.currentTimeMillis()
                                     val components = HlcComparator.parseHlcComponents(change.hlcTimestamp)
-                                    val pt = components?.first ?: 0L
-                                    val lc = components?.second ?: 0
-                                    val node = components?.third ?: ""
+                                    val physicalTime = components?.first ?: 0L
+                                    val logicalCounter = components?.second ?: 0
+                                    val originNode = components?.third ?: ""
 
                                     upsertStmt.setString(1, change.collection)
                                     upsertStmt.setString(2, change.id)
@@ -336,9 +336,9 @@ class SqliteDbAdapter(
                                     changelogStmt.setInt(3, change.type.ordinal)
                                     changelogStmt.setBytes(4, change.payload)
                                     changelogStmt.setString(5, change.hlcTimestamp)
-                                    changelogStmt.setLong(6, pt)
-                                    changelogStmt.setInt(7, lc)
-                                    changelogStmt.setString(8, node)
+                                    changelogStmt.setLong(6, physicalTime)
+                                    changelogStmt.setInt(7, logicalCounter)
+                                    changelogStmt.setString(8, originNode)
                                     changelogStmt.setLong(9, now)
                                     changelogStmt.executeUpdate()
                                     updateMaxSeenHlc(change.hlcTimestamp)

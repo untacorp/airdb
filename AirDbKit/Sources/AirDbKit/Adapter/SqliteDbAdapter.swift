@@ -327,9 +327,9 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
     public func appendChangelog(_ record: ChangeRecord) throws {
         guard let db = db else { throw SqliteError.databaseClosed }
         let components = HlcComparator.parseHlcComponents(record.hlcTimestamp)
-        let pt = components?.pt ?? 0
-        let lc = components?.lc ?? 0
-        let node = components?.node ?? ""
+        let physicalTime = components?.pt ?? 0
+        let logicalCounter = components?.lc ?? 0
+        let originNode = components?.node ?? ""
 
         let sql = """
         INSERT INTO airdb_changelog 
@@ -354,9 +354,9 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
             }
         }
         sqlite3_bind_text(stmt, 5, record.hlcTimestamp, -1, sqliteTransient)
-        sqlite3_bind_int64(stmt, 6, pt)
-        sqlite3_bind_int(stmt, 7, Int32(lc))
-        sqlite3_bind_text(stmt, 8, node, -1, sqliteTransient)
+        sqlite3_bind_int64(stmt, 6, physicalTime)
+        sqlite3_bind_int(stmt, 7, Int32(logicalCounter))
+        sqlite3_bind_text(stmt, 8, originNode, -1, sqliteTransient)
         sqlite3_bind_int64(stmt, 9, Int64(Date().timeIntervalSince1970 * 1000))
 
         if sqlite3_step(stmt) != SQLITE_DONE {
@@ -571,9 +571,9 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
 
                 // 2. Append to changelog
                 let components = HlcComparator.parseHlcComponents(change.hlcTimestamp)
-                let pt = components?.pt ?? 0
-                let lc = components?.lc ?? 0
-                let node = components?.node ?? ""
+                let physicalTime = components?.pt ?? 0
+                let logicalCounter = components?.lc ?? 0
+                let originNode = components?.node ?? ""
 
                 sqlite3_reset(changelogStmt)
                 sqlite3_clear_bindings(changelogStmt)
@@ -588,9 +588,9 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                     }
                 }
                 sqlite3_bind_text(changelogStmt, 5, change.hlcTimestamp, -1, sqliteTransient)
-                sqlite3_bind_int64(changelogStmt, 6, pt)
-                sqlite3_bind_int(changelogStmt, 7, Int32(lc))
-                sqlite3_bind_text(changelogStmt, 8, node, -1, sqliteTransient)
+                sqlite3_bind_int64(changelogStmt, 6, physicalTime)
+                sqlite3_bind_int(changelogStmt, 7, Int32(logicalCounter))
+                sqlite3_bind_text(changelogStmt, 8, originNode, -1, sqliteTransient)
                 sqlite3_bind_int64(changelogStmt, 9, now)
 
                 if sqlite3_step(changelogStmt) != SQLITE_DONE {
