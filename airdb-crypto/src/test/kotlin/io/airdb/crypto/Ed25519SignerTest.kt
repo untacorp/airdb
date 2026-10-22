@@ -105,4 +105,34 @@ class Ed25519SignerTest {
         )
         assertFalse(Ed25519Signer.verify(forgedDigest, signature, kp.publicKeyRaw))
     }
+
+    @Test
+    fun testConcurrentSignAndVerify() {
+        val kp = Ed25519Signer.generateKeyPair()
+        val threadCount = 8
+        val iterations = 50
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(threadCount)
+        val latch = java.util.concurrent.CountDownLatch(threadCount)
+        val errors = java.util.concurrent.atomic.AtomicInteger(0)
+
+        for (i in 0 until threadCount) {
+            executor.submit {
+                try {
+                    for (j in 0 until iterations) {
+                        val msg = "Message-$i-$j".toByteArray(Charsets.UTF_8)
+                        val sig = Ed25519Signer.sign(msg, kp.privateKeyRaw)
+                        if (!Ed25519Signer.verify(msg, sig, kp.publicKeyRaw)) {
+                            errors.incrementAndGet()
+                        }
+                    }
+                } finally {
+                    latch.countDown()
+                }
+            }
+        }
+
+        assertTrue(latch.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        executor.shutdown()
+        assertEquals(0, errors.get(), "Errors occurred during concurrent signing/verification")
+    }
 }

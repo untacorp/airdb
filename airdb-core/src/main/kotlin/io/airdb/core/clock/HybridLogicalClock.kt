@@ -16,6 +16,8 @@
 
 package io.airdb.core.clock
 
+import java.util.concurrent.atomic.AtomicReference
+
 /**
  * Monotonically increasing Hybrid Logical Clock (HLC) timestamp.
  *
@@ -64,41 +66,39 @@ class HybridLogicalClock(
     private val timeProvider: () -> Long = System::currentTimeMillis
 ) {
 
-    private var latest = HlcTimestamp(0L, 0, nodeId)
+    private val latest = AtomicReference(HlcTimestamp(0L, 0, nodeId))
 
     /**
      * Generates a new monotonically increasing timestamp for a local database mutation.
      */
-    @Synchronized
     fun now(): HlcTimestamp {
         val pt = timeProvider()
-        val nextPt = maxOf(latest.physicalTime, pt)
-        val nextLogical = if (nextPt == latest.physicalTime) latest.logicalCounter + 1 else 0
-
-        latest = HlcTimestamp(nextPt, nextLogical, nodeId)
-        return latest
+        return latest.updateAndGet { current ->
+            val nextPt = maxOf(current.physicalTime, pt)
+            val nextLogical = if (nextPt == current.physicalTime) current.logicalCounter + 1 else 0
+            HlcTimestamp(nextPt, nextLogical, nodeId)
+        }
     }
 
     /**
      * Advances local HLC clock upon observing an incoming remote HLC timestamp from a peer.
      */
-    @Synchronized
     fun update(remote: HlcTimestamp): HlcTimestamp {
         val pt = timeProvider()
-        val nextPt = maxOf(maxOf(latest.physicalTime, remote.physicalTime), pt)
+        return latest.updateAndGet { current ->
+            val nextPt = maxOf(maxOf(current.physicalTime, remote.physicalTime), pt)
 
-        val nextLogical = when {
-            nextPt == latest.physicalTime && nextPt == remote.physicalTime ->
-                maxOf(latest.logicalCounter, remote.logicalCounter) + 1
-            nextPt == latest.physicalTime -> latest.logicalCounter + 1
-            nextPt == remote.physicalTime -> remote.logicalCounter + 1
-            else -> 0
+            val nextLogical = when {
+                nextPt == current.physicalTime && nextPt == remote.physicalTime ->
+                    maxOf(current.logicalCounter, remote.logicalCounter) + 1
+                nextPt == current.physicalTime -> current.logicalCounter + 1
+                nextPt == remote.physicalTime -> remote.logicalCounter + 1
+                else -> 0
+            }
+
+            HlcTimestamp(nextPt, nextLogical, nodeId)
         }
-
-        latest = HlcTimestamp(nextPt, nextLogical, nodeId)
-        return latest
     }
 
-    @Synchronized
-    fun current(): HlcTimestamp = latest
+    fun current(): HlcTimestamp = latest.get()
 }
