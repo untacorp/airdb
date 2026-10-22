@@ -221,4 +221,25 @@ final class SqliteDbAdapterTests: XCTestCase {
 
         await adapter.close()
     }
+
+    func testReadChangelogSinceNumericOrderingAndLimit() async throws {
+        let adapter = try SqliteDbAdapter.inMemory()
+
+        let rec1 = ChangeRecord(id: "rec-2", collection: "tests", type: .insert, payload: Data([1]), hlcTimestamp: "1000-2-nodeA")
+        let rec2 = ChangeRecord(id: "rec-10", collection: "tests", type: .insert, payload: Data([2]), hlcTimestamp: "1000-10-nodeA")
+        let rec3 = ChangeRecord(id: "rec-20", collection: "tests", type: .insert, payload: Data([3]), hlcTimestamp: "1000-20-nodeA")
+
+        try await adapter.applyChanges([rec1, rec2, rec3])
+
+        let changesSince2 = try await adapter.readChangelogSince(sinceHlcTimestamp: "1000-2-nodeA", limit: 10)
+        XCTAssertEqual(changesSince2.count, 2)
+        XCTAssertEqual(changesSince2[0].id, "rec-10")
+        XCTAssertEqual(changesSince2[1].id, "rec-20")
+
+        let limited = try await adapter.readChangelogSince(sinceHlcTimestamp: "1000-2-nodeA", limit: 1)
+        XCTAssertEqual(limited.count, 1)
+        XCTAssertEqual(limited[0].id, "rec-10")
+
+        await adapter.close()
+    }
 }
