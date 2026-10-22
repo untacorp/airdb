@@ -172,7 +172,6 @@ class SqliteDbAdapterTest {
     }
 
     @Test
-    @Test
     fun testReadChangelogSinceNumericOrderingAndLimit() = runBlocking {
         SqliteDbAdapter.inMemory().use { adapter ->
             // In ASCII sorting, "1000-10-nodeA" is smaller than "1000-2-nodeA"
@@ -226,8 +225,6 @@ class SqliteDbAdapterTest {
                 )
             )
             assertEquals("1700000000000-10-nodeA", adapter.getLatestHlc())
-        }
-    }
         }
     }
 }
