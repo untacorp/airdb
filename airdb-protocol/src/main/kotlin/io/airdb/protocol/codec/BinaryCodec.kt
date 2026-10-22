@@ -61,11 +61,11 @@ object BinaryCodec {
             }
         }
 
-        if (packet.recipientId != null) {
+        val recipientId = packet.recipientId
+        val hasRecipient = recipientId != null
+        if (hasRecipient) {
             flags = flags or PacketFlags.FLAG_HAS_RECIPIENT.toInt()
         }
-
-        val hasRecipient = packet.recipientId != null
         val headerSize = MIN_HEADER_SIZE + (if (hasRecipient) RECIPIENT_ID_SIZE else 0)
 
         // 2. Encrypt if clusterKey provided
@@ -87,8 +87,8 @@ object BinaryCodec {
             headerBuffer.putShort(encryptedLength.toShort())
             headerBuffer.putLong(packet.senderId)
 
-            if (hasRecipient) {
-                headerBuffer.putLong(packet.recipientId!!)
+            if (recipientId != null) {
+                headerBuffer.putLong(recipientId)
             }
 
             val aad = headerBuffer.array()
@@ -114,8 +114,8 @@ object BinaryCodec {
             buffer.putShort(payloadBytes.size.toShort())
             buffer.putLong(packet.senderId)
 
-            if (hasRecipient) {
-                buffer.putLong(packet.recipientId!!)
+            if (recipientId != null) {
+                buffer.putLong(recipientId)
             }
 
             buffer.put(payloadBytes)

@@ -25,6 +25,8 @@ import java.util.zip.Inflater
  */
 object Compression {
 
+    const val MAX_DECOMPRESSED_SIZE = 65535
+
     fun compress(input: ByteArray): ByteArray {
         val deflater = Deflater(Deflater.BEST_COMPRESSION)
         deflater.setInput(input)
@@ -40,17 +42,27 @@ object Compression {
         return outputStream.toByteArray()
     }
 
-    fun decompress(input: ByteArray): ByteArray {
+    fun decompress(input: ByteArray, maxDecompressedSize: Int = MAX_DECOMPRESSED_SIZE): ByteArray {
         val inflater = Inflater()
         inflater.setInput(input)
 
-        val outputStream = ByteArrayOutputStream(input.size * 2)
+        val outputStream = ByteArrayOutputStream(minOf(input.size * 2, maxDecompressedSize))
         val buffer = ByteArray(1024)
-        while (!inflater.finished()) {
-            val count = inflater.inflate(buffer)
-            outputStream.write(buffer, 0, count)
+        var totalInflated = 0
+
+        try {
+            while (!inflater.finished()) {
+                val count = inflater.inflate(buffer)
+                if (count == 0 && inflater.needsInput()) break
+                totalInflated += count
+                if (totalInflated > maxDecompressedSize) {
+                    throw IllegalArgumentException("Decompressed payload exceeds max allowed size of $maxDecompressedSize bytes")
+                }
+                outputStream.write(buffer, 0, count)
+            }
+        } finally {
+            inflater.end()
         }
-        inflater.end()
         return outputStream.toByteArray()
     }
 }
