@@ -101,11 +101,29 @@ abstract class AbstractAirDbAdapter : AirDbAdapter {
     }
 
     override suspend fun getMissingChanges(peerClock: Map<String, String>, limit: Int): List<ChangeRecord> {
-        return readChangelogSince(null, limit = limit * 2).filter { record ->
-            val origin = HlcComparator.extractNodeId(record.hlcTimestamp) ?: ""
-            val peerKnown = peerClock[origin]
-            peerKnown == null || HlcComparator.compare(record.hlcTimestamp, peerKnown) > 0
-        }.take(limit)
+        val missing = ArrayList<ChangeRecord>(limit)
+        var cursor: String? = null
+        val pageSize = maxOf(limit, 100)
+
+        while (missing.size < limit) {
+            val batch = readChangelogSince(cursor, limit = pageSize)
+            if (batch.isEmpty()) break
+
+            for (record in batch) {
+                val origin = HlcComparator.extractNodeId(record.hlcTimestamp) ?: ""
+                val peerKnown = peerClock[origin]
+                if (peerKnown == null || HlcComparator.compare(record.hlcTimestamp, peerKnown) > 0) {
+                    missing.add(record)
+                    if (missing.size >= limit) break
+                }
+            }
+
+            if (batch.size < pageSize) break
+            val maxHlc = batch.maxOfWith(HlcComparator) { it.hlcTimestamp }
+            if (maxHlc == cursor) break
+            cursor = maxHlc
+        }
+        return missing
     }
 
     override suspend fun applyChanges(changes: List<ChangeRecord>) {

@@ -207,6 +207,7 @@ class SqliteDbAdapter(
                     }
                 }
             }
+            changes.sortWith(Comparator.comparing({ it.hlcTimestamp }, HlcComparator))
             changes
         }
     }

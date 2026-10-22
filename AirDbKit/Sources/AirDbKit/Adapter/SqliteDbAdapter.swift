@@ -272,6 +272,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                 break
             }
         }
+        records.sort(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })
         return records
     }
 
@@ -374,12 +375,34 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
     }
 
     public func getMissingChanges(peerClock: [String: String], limit: Int = 500) throws -> [ChangeRecord] {
-        let candidates = try readChangelogSince(sinceHlcTimestamp: nil, limit: limit * 2)
-        return candidates.filter { record in
-            let origin = HlcComparator.extractNodeId(from: record.hlcTimestamp) ?? ""
-            guard let peerKnown = peerClock[origin] else { return true }
-            return HlcComparator.compare(record.hlcTimestamp, peerKnown) == .orderedDescending
-        }.prefix(limit).map { $0 }
+        var missing: [ChangeRecord] = []
+        missing.reserveCapacity(limit)
+        var cursor: String? = nil
+        let pageSize = max(limit, 100)
+
+        while missing.count < limit {
+            let batch = try readChangelogSince(sinceHlcTimestamp: cursor, limit: pageSize)
+            if batch.isEmpty { break }
+
+            for record in batch {
+                let origin = HlcComparator.extractNodeId(from: record.hlcTimestamp) ?? ""
+                if let peerKnown = peerClock[origin] {
+                    if HlcComparator.compare(record.hlcTimestamp, peerKnown) == .orderedDescending {
+                        missing.append(record)
+                        if missing.count >= limit { break }
+                    }
+                } else {
+                    missing.append(record)
+                    if missing.count >= limit { break }
+                }
+            }
+
+            if batch.count < pageSize { break }
+            guard let maxHlc = batch.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })?.hlcTimestamp, maxHlc != cursor else { break }
+            cursor = maxHlc
+        }
+
+        return missing
     }
 
     public func applyChanges(_ changes: [ChangeRecord]) throws {
