@@ -116,4 +116,41 @@ class GattOperationQueueTest {
         assertEquals(1, op2Attempts.get(), "Op 2 should be dispatched after Op 1 exhausts retries")
         assertEquals(1, queue.pendingCount("link-1"))
     }
+
+    @Test
+    fun testWatchdogTimeoutUnfreezesQueueWhenCallbackNeverFires() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        val testScope = TestScope(testDispatcher)
+
+        // Queue with 50ms operation timeout and 0 retries
+        val queue = GattOperationQueue(testScope, retryDelayMs = 10L, maxRetries = 0, operationTimeoutMs = 50L)
+        val executedOps = mutableListOf<Int>()
+
+        // Op 1 accepts but driver silently drops callback
+        queue.enqueue("link-1", byteArrayOf(1), false) {
+            executedOps.add(1)
+            true
+        }
+
+        // Op 2 queued behind Op 1
+        queue.enqueue("link-1", byteArrayOf(2), false) {
+            executedOps.add(2)
+            true
+        }
+
+        // Op 1 dispatched, Op 2 waiting
+        assertEquals(listOf(1), executedOps)
+        assertEquals(2, queue.pendingCount("link-1"))
+
+        // Advance time by 49ms (watchdog has not fired yet)
+        testScheduler.advanceTimeBy(49L)
+        assertEquals(listOf(1), executedOps)
+
+        // Advance time past 50ms watchdog timeout
+        testScheduler.advanceTimeBy(2L)
+
+        // Watchdog fires, completes Op 1 with failure (retries exhausted), and dispatches Op 2!
+        assertEquals(listOf(1, 2), executedOps, "Op 2 must be dispatched after Op 1 times out")
+        assertEquals(1, queue.pendingCount("link-1"))
+    }
 }
