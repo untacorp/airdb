@@ -17,6 +17,7 @@
 package io.airdb.transport.ble.queue
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.ArrayDeque
@@ -42,7 +43,8 @@ class GattOperationQueue(
     private val maxQueueSize: Int = 256,
     private val maxBytesPerLink: Int = 1_048_576,
     private val retryDelayMs: Long = 15L,
-    private val maxRetries: Int = 3
+    private val maxRetries: Int = 3,
+    private val operationTimeoutMs: Long = 5000L
 ) {
 
     private class LinkState {
@@ -50,6 +52,7 @@ class GattOperationQueue(
         var pendingBytes = 0
         var inFlight = false
         var retryScheduled = false
+        var watchdogJob: Job? = null
     }
 
     private val lock = Any()
@@ -103,12 +106,33 @@ class GattOperationQueue(
 
         if (!accepted) {
             scheduleRetry(linkId)
+        } else {
+            startWatchdog(linkId)
+        }
+    }
+
+    private fun startWatchdog(linkId: String) {
+        synchronized(lock) {
+            val state = linkStates[linkId] ?: return
+            state.watchdogJob?.cancel()
+            state.watchdogJob = scope.launch {
+                delay(operationTimeoutMs)
+                val isStillInFlight = synchronized(lock) {
+                    val current = linkStates[linkId] ?: return@synchronized false
+                    current.inFlight
+                }
+                if (isStillInFlight) {
+                    onOperationComplete(linkId, isSuccess = false)
+                }
+            }
         }
     }
 
     private fun scheduleRetry(linkId: String) {
         val doSchedule = synchronized(lock) {
             val state = linkStates[linkId] ?: return
+            state.watchdogJob?.cancel()
+            state.watchdogJob = null
             state.inFlight = false
             if (state.retryScheduled || state.pending.isEmpty()) false else {
                 state.retryScheduled = true
@@ -142,6 +166,9 @@ class GattOperationQueue(
 
         synchronized(lock) {
             val state = linkStates[linkId] ?: return
+            state.watchdogJob?.cancel()
+            state.watchdogJob = null
+
             val head = state.pending.peekFirst() ?: run {
                 linkStates.remove(linkId)
                 return
@@ -188,7 +215,8 @@ class GattOperationQueue(
      */
     fun onLinkDisconnected(linkId: String) {
         synchronized(lock) {
-            linkStates.remove(linkId)
+            val state = linkStates.remove(linkId)
+            state?.watchdogJob?.cancel()
         }
     }
 
