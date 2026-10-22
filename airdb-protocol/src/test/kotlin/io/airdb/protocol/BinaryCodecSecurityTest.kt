@@ -104,4 +104,30 @@ class BinaryCodecSecurityTest {
 
         assertNull(BinaryCodec.decode(buffer.array()), "Corrupted zlib payload must return null rather than throw")
     }
+
+    @Test
+    fun testZipBombDecompressionRejected() {
+        // Create 100 KB payload of zeroes that compresses extremely small (~100 bytes)
+        val largeZeroes = ByteArray(100_000)
+        val compressed = io.airdb.protocol.codec.Compression.compress(largeZeroes)
+
+        // Decompressing with default 65535 limit must throw IllegalArgumentException
+        assertThrows(IllegalArgumentException::class.java) {
+            io.airdb.protocol.codec.Compression.decompress(compressed, maxDecompressedSize = 65535)
+        }
+
+        // BinaryCodec.decode must catch this and return null safely rather than crashing
+        val buffer = ByteBuffer.allocate(BinaryCodec.MIN_HEADER_SIZE + compressed.size).order(ByteOrder.BIG_ENDIAN)
+        buffer.put(BinaryCodec.MAGIC_BYTE_0)
+        buffer.put(BinaryCodec.MAGIC_BYTE_1)
+        buffer.put(1.toByte())
+        buffer.put(PacketType.DELTA_BATCH.code)
+        buffer.put(PacketFlags.FLAG_COMPRESSED)
+        buffer.putLong(System.currentTimeMillis())
+        buffer.putShort(compressed.size.toShort())
+        buffer.putLong(1234L)
+        buffer.put(compressed)
+
+        assertNull(BinaryCodec.decode(buffer.array()), "Decompression exceeding 64KB must be safely rejected")
+    }
 }
