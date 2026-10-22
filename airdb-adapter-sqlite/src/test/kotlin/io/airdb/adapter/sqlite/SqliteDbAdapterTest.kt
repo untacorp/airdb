@@ -142,9 +142,11 @@ class SqliteDbAdapterTest {
             // Compact tombstones older than threshold 1000-6-nodeA
             adapter.compact(pruneHlcThreshold = "1000-6-nodeA")
 
-            // After compaction, tombstone is purged completely from disk
+            // After compaction, tombstone is purged completely from disk and changelog
             assertFalse(adapter.isRecordDeleted("patients", "patient-007"))
             assertNull(adapter.readEntity("patients", "patient-007"))
+            val changelog = adapter.readChangelogSince(null, 100)
+            assertFalse(changelog.any { it.id == "patient-007" && it.type == MutationType.DELETE })
         }
     }
 
