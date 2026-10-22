@@ -80,6 +80,7 @@ nav:
       - Storage & Persistence (BYOD):
           - Overview & Seam Contract: manual/persistence/index.md
           - Built-in SQLite Engine: manual/persistence/sqlite.md
+          - AeroLog Bitcask Engine: manual/persistence/aerolog.md
           - Android Jetpack Room: manual/persistence/room.md
           - SQLDelight Multiplatform: manual/persistence/sqldelight.md
           - Apple Native SQLite: manual/persistence/apple-sqlite.md

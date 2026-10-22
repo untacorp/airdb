@@ -78,9 +78,9 @@ Write throughput across persistence adapters when ingesting 128-byte delta batch
 ```mermaid
 xychart-beta
     title "Local Persistence Write Throughput (Ops/Sec)"
-    x-axis ["SQLite (WAL)", "Jetpack Room", "Apple SqliteDbAdapter", "In-Memory KV"]
-    y-axis "Write Throughput (ops/sec)" 0 --> 35000
-    bar [14200, 11800, 16500, 31200]
+    x-axis ["SQLite WAL", "Jetpack Room", "Apple Sqlite", "In-Memory KV", "AeroLog Bitcask"]
+    y-axis "Write Throughput (ops/sec)" 0 --> 250000
+    bar [14200, 11800, 16500, 31200, 219800]
 ```
 
 ---
@@ -90,6 +90,7 @@ xychart-beta
 Follow our dedicated guides for your platform's preferred storage engine:
 
 - **[Built-in SQLite Engine](sqlite.md)**: Production WAL-mode SQLite storage on Android and Apple.
+- **[AeroLog Bitcask Engine](aerolog.md)**: High-throughput, sequential append-only Bitcask log engine (>200,000 writes/sec) in pure Rust with native HLC causality.
 - **[Android Jetpack Room](room.md)**: Step-by-step Room database integration with entities, DAOs, and changelog tables.
 - **[SQLDelight Multiplatform](sqldelight.md)**: Type-safe SQLDelight schema setup for shared Kotlin code.
 - **[Apple Native SQLite](apple-sqlite.md)**: Fast, zero-dependency `libsqlite3` setup on iOS and macOS.

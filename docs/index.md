@@ -40,7 +40,7 @@ flowchart TD
 
     subgraph PersistenceTier ["Persistence Layer (Pluggable Seam)"]
         SQLite["airdb-adapter-sqlite<br/>(SqliteDbAdapter)<br/>WAL Mode • Changelog Index<br/>Tombstone Soft-Deletes"]
-        BYOD["Bring Your Own Database<br/>(BYOD Adapters)<br/>Room • SQLDelight • GRDB<br/>SwiftData • In-Memory KV"]
+        BYOD["Bring Your Own Database<br/>(BYOD Adapters)<br/>AeroLog • Room • GRDB<br/>SQLDelight • SwiftData"]
     end
 
     subgraph EngineTier ["Reconciliation & Causality Core"]
