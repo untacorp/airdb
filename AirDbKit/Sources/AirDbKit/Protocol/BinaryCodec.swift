@@ -50,31 +50,37 @@ public enum BinaryCodec {
             flags |= PacketFlags.hasRecipient
         }
 
-        if let clusterKey = clusterKey {
+        let isEncrypted = clusterKey != nil
+        if isEncrypted {
             flags |= PacketFlags.encrypted
-            let encryptedLength = payloadData.count + ChaChaPolyCipher.nonceSize + ChaChaPolyCipher.tagSize
+        }
 
-            var header = Data()
-            header.append(magicByte0)
-            header.append(magicByte1)
-            header.append(packet.version)
-            header.append(packet.type.rawValue)
-            header.append(flags)
+        let wirePayloadLength = isEncrypted
+            ? payloadData.count + ChaChaPolyCipher.nonceSize + ChaChaPolyCipher.tagSize
+            : payloadData.count
 
-            var ts = UInt64(bitPattern: packet.timestamp).bigEndian
-            header.append(contentsOf: withUnsafeBytes(of: &ts) { Array($0) })
+        var header = Data()
+        header.append(magicByte0)
+        header.append(magicByte1)
+        header.append(packet.version)
+        header.append(packet.type.rawValue)
+        header.append(flags)
 
-            var len = UInt16(encryptedLength).bigEndian
-            header.append(contentsOf: withUnsafeBytes(of: &len) { Array($0) })
+        var ts = UInt64(bitPattern: packet.timestamp).bigEndian
+        header.append(contentsOf: withUnsafeBytes(of: &ts) { Array($0) })
 
-            var sender = UInt64(bitPattern: packet.senderId).bigEndian
-            header.append(contentsOf: withUnsafeBytes(of: &sender) { Array($0) })
+        var len = UInt16(wirePayloadLength).bigEndian
+        header.append(contentsOf: withUnsafeBytes(of: &len) { Array($0) })
 
-            if let recipient = packet.recipientId {
-                var rec = UInt64(bitPattern: recipient).bigEndian
-                header.append(contentsOf: withUnsafeBytes(of: &rec) { Array($0) })
-            }
+        var sender = UInt64(bitPattern: packet.senderId).bigEndian
+        header.append(contentsOf: withUnsafeBytes(of: &sender) { Array($0) })
 
+        if let recipient = packet.recipientId {
+            var rec = UInt64(bitPattern: recipient).bigEndian
+            header.append(contentsOf: withUnsafeBytes(of: &rec) { Array($0) })
+        }
+
+        if let clusterKey = clusterKey {
             guard let encryptedPayload = try? ChaChaPolyCipher.encrypt(
                 plaintext: payloadData,
                 key: clusterKey,
@@ -82,35 +88,14 @@ public enum BinaryCodec {
             ) else {
                 return Data()
             }
-
             var total = header
             total.append(encryptedPayload)
             return total
-        } else {
-            var data = Data()
-            data.append(magicByte0)
-            data.append(magicByte1)
-            data.append(packet.version)
-            data.append(packet.type.rawValue)
-            data.append(flags)
-
-            var ts = UInt64(bitPattern: packet.timestamp).bigEndian
-            data.append(contentsOf: withUnsafeBytes(of: &ts) { Array($0) })
-
-            var len = UInt16(payloadData.count).bigEndian
-            data.append(contentsOf: withUnsafeBytes(of: &len) { Array($0) })
-
-            var sender = UInt64(bitPattern: packet.senderId).bigEndian
-            data.append(contentsOf: withUnsafeBytes(of: &sender) { Array($0) })
-
-            if let recipient = packet.recipientId {
-                var rec = UInt64(bitPattern: recipient).bigEndian
-                data.append(contentsOf: withUnsafeBytes(of: &rec) { Array($0) })
-            }
-
-            data.append(payloadData)
-            return data
         }
+
+        var total = header
+        total.append(payloadData)
+        return total
     }
 
     /// Deserializes wire data into an AirDbPacket, returning nil if data is malformed or corrupt.
@@ -191,8 +176,6 @@ public enum BinaryCodec {
         )
     }
 
-    // MARK: - Compression
-
     public static func compress(_ source: Data) -> Data? {
         guard !source.isEmpty else { return source }
         let destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: source.count)
@@ -216,7 +199,6 @@ public enum BinaryCodec {
 
     public static func decompress(_ source: Data) -> Data? {
         guard !source.isEmpty else { return source }
-        // Allocate generous buffer for decompressed data (up to 64KB per spec)
         let maxBufferSize = maxPayloadSize
         let destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: maxBufferSize)
         defer { destinationBuffer.deallocate() }

@@ -38,7 +38,6 @@ class MemoryDbAdapterTest {
         assertEquals("1000-0-nodeA", adapter.getLatestHlc())
         assertEquals(record1, adapter.getRecord("inventory", "item-1"))
 
-        // Stale update should be rejected
         val staleRecord = ChangeRecord(
             id = "item-1",
             collection = "inventory",
@@ -49,7 +48,6 @@ class MemoryDbAdapterTest {
         adapter.applyChanges(listOf(staleRecord))
         assertEquals(record1, adapter.getRecord("inventory", "item-1"))
 
-        // Fresher update should win
         val freshRecord = ChangeRecord(
             id = "item-1",
             collection = "inventory",
@@ -57,7 +55,6 @@ class MemoryDbAdapterTest {
             payload = "{\"qty\": 20}".toByteArray(),
             hlcTimestamp = "1100-0-nodeB"
         )
-        // Test Tombstone: Fresher DELETE operation should mark record as deleted
         val deleteRecord = ChangeRecord(
             id = "item-1",
             collection = "inventory",
@@ -69,7 +66,6 @@ class MemoryDbAdapterTest {
         assertTrue(adapter.isRecordDeleted("inventory", "item-1"))
         assertEquals(0, adapter.getActiveRecords("inventory").size)
 
-        // Stale INSERT/UPDATE must NOT resurrect a deleted record
         val zombieRecord = ChangeRecord(
             id = "item-1",
             collection = "inventory",

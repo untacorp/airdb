@@ -47,6 +47,8 @@ class AeroLogAirDbAdapter(
 
     companion object {
         private const val CHANGELOG_STREAM = "__airdb_changelog__"
+        private const val FNV_OFFSET_BASIS = 0xcbf29ce484222325UL
+        private const val FNV_PRIME = 0x100000001b3UL
 
         /**
          * Opens or creates an AeroLog-backed AirDB database in the specified directory.
@@ -57,10 +59,10 @@ class AeroLogAirDbAdapter(
         }
 
         private fun hashNodeId(nodeId: String): ULong {
-            var hash = 0xcbf29ce484222325UL // FNV-1a 64-bit offset basis
+            var hash = FNV_OFFSET_BASIS
             for (byte in nodeId.toByteArray(Charsets.UTF_8)) {
                 hash = hash xor byte.toUByte().toULong()
-                hash = hash * 0x100000001b3UL // FNV-1a 64-bit prime
+                hash = hash * FNV_PRIME
             }
             return if (hash == 0UL) 1UL else hash
         }
@@ -132,21 +134,20 @@ class AeroLogAirDbAdapter(
         mutex.withLock {
             for (change in changes) {
                 val existingBytes = db.get(change.collection, change.id)
-                val existing = if (existingBytes != null) {
-                    deserializeStoredEntity(change.collection, change.id, existingBytes)
-                } else null
-
-                if (existing == null || HlcComparator.compare(change.hlcTimestamp, existing.hlcTimestamp) > 0) {
-                    val entity = StoredEntity(
-                        collection = change.collection,
-                        id = change.id,
-                        type = change.type,
-                        payload = change.payload,
-                        hlcTimestamp = change.hlcTimestamp
-                    )
-                    db.put(entity.collection, entity.id, serializeStoredEntity(entity))
-                    changelogStream.append(serializeChangeRecord(change))
+                if (existingBytes != null) {
+                    val existing = deserializeStoredEntity(change.collection, change.id, existingBytes)
+                    if (HlcComparator.compare(change.hlcTimestamp, existing.hlcTimestamp) <= 0) continue
                 }
+
+                val entity = StoredEntity(
+                    collection = change.collection,
+                    id = change.id,
+                    type = change.type,
+                    payload = change.payload,
+                    hlcTimestamp = change.hlcTimestamp
+                )
+                db.put(entity.collection, entity.id, serializeStoredEntity(entity))
+                changelogStream.append(serializeChangeRecord(change))
             }
         }
     }
@@ -207,8 +208,6 @@ class AeroLogAirDbAdapter(
             db.close()
         } catch (_: Exception) {}
     }
-
-    // Binary serialization helpers
 
     private fun serializeStoredEntity(entity: StoredEntity): ByteArray {
         val hlcBytes = entity.hlcTimestamp.toByteArray(Charsets.UTF_8)

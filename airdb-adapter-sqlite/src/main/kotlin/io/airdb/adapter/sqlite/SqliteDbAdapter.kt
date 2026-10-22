@@ -29,6 +29,7 @@ import java.io.Closeable
 import java.io.File
 import java.sql.Connection
 import java.sql.DriverManager
+import java.sql.PreparedStatement
 
 /**
  * Production-ready ACID SQLite database adapter for AirDB.
@@ -68,14 +69,12 @@ class SqliteDbAdapter(
 
     private fun initializeDatabase() {
         connection.createStatement().use { stmt ->
-            // Enable WAL mode and foreign key constraints for safety and speed
             if (!jdbcUrl.contains(":memory:")) {
                 stmt.execute("PRAGMA journal_mode = WAL;")
             }
             stmt.execute("PRAGMA synchronous = NORMAL;")
             stmt.execute("PRAGMA foreign_keys = ON;")
 
-            // Table 1: Live entity states with primary key on (collection, id)
             stmt.execute(
                 """
                 CREATE TABLE IF NOT EXISTS airdb_entities (
@@ -97,7 +96,6 @@ class SqliteDbAdapter(
                 """.trimIndent()
             )
 
-            // Table 2: Append-only changelog sequence for delta synchronization
             stmt.execute(
                 """
                 CREATE TABLE IF NOT EXISTS airdb_changelog (
@@ -115,7 +113,6 @@ class SqliteDbAdapter(
                 """.trimIndent()
             )
 
-            // Safe migration for existing schemas
             try { stmt.execute("ALTER TABLE airdb_changelog ADD COLUMN physical_time INTEGER NOT NULL DEFAULT 0;") } catch (_: Exception) {}
             try { stmt.execute("ALTER TABLE airdb_changelog ADD COLUMN logical_counter INTEGER NOT NULL DEFAULT 0;") } catch (_: Exception) {}
             try { stmt.execute("ALTER TABLE airdb_changelog ADD COLUMN origin_node TEXT NOT NULL DEFAULT '';") } catch (_: Exception) {}
@@ -309,40 +306,7 @@ class SqliteDbAdapter(
                     connection.prepareStatement(upsertSql).use { upsertStmt ->
                         connection.prepareStatement(changelogSql).use { changelogStmt ->
                             for (change in changes) {
-                                selectStmt.setString(1, change.collection)
-                                selectStmt.setString(2, change.id)
-                                val rs = selectStmt.executeQuery()
-                                val existingHlc = if (rs.next()) rs.getString("hlc_timestamp") else null
-                                rs.close()
-
-                                // LWW check based on canonical HLC total order
-                                if (existingHlc == null || HlcComparator.compare(change.hlcTimestamp, existingHlc) > 0) {
-                                    val now = System.currentTimeMillis()
-                                    val components = HlcComparator.parseHlcComponents(change.hlcTimestamp)
-                                    val physicalTime = components?.first ?: 0L
-                                    val logicalCounter = components?.second ?: 0
-                                    val originNode = components?.third ?: ""
-
-                                    upsertStmt.setString(1, change.collection)
-                                    upsertStmt.setString(2, change.id)
-                                    upsertStmt.setInt(3, change.type.ordinal)
-                                    upsertStmt.setBytes(4, change.payload)
-                                    upsertStmt.setString(5, change.hlcTimestamp)
-                                    upsertStmt.setLong(6, now)
-                                    upsertStmt.executeUpdate()
-
-                                    changelogStmt.setString(1, change.collection)
-                                    changelogStmt.setString(2, change.id)
-                                    changelogStmt.setInt(3, change.type.ordinal)
-                                    changelogStmt.setBytes(4, change.payload)
-                                    changelogStmt.setString(5, change.hlcTimestamp)
-                                    changelogStmt.setLong(6, physicalTime)
-                                    changelogStmt.setInt(7, logicalCounter)
-                                    changelogStmt.setString(8, originNode)
-                                    changelogStmt.setLong(9, now)
-                                    changelogStmt.executeUpdate()
-                                    updateMaxSeenHlc(change.hlcTimestamp)
-                                }
+                                applySingleChange(selectStmt, upsertStmt, changelogStmt, change)
                             }
                         }
                     }
@@ -355,6 +319,49 @@ class SqliteDbAdapter(
                 connection.autoCommit = prevAutoCommit
             }
         }
+    }
+
+    private fun applySingleChange(
+        selectStmt: PreparedStatement,
+        upsertStmt: PreparedStatement,
+        changelogStmt: PreparedStatement,
+        change: ChangeRecord
+    ) {
+        selectStmt.setString(1, change.collection)
+        selectStmt.setString(2, change.id)
+        val rs = selectStmt.executeQuery()
+        val existingHlc = if (rs.next()) rs.getString("hlc_timestamp") else null
+        rs.close()
+
+        if (existingHlc != null && HlcComparator.compare(change.hlcTimestamp, existingHlc) <= 0) {
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val components = HlcComparator.parseHlcComponents(change.hlcTimestamp)
+        val physicalTime = components?.first ?: 0L
+        val logicalCounter = components?.second ?: 0
+        val originNode = components?.third ?: ""
+
+        upsertStmt.setString(1, change.collection)
+        upsertStmt.setString(2, change.id)
+        upsertStmt.setInt(3, change.type.ordinal)
+        upsertStmt.setBytes(4, change.payload)
+        upsertStmt.setString(5, change.hlcTimestamp)
+        upsertStmt.setLong(6, now)
+        upsertStmt.executeUpdate()
+
+        changelogStmt.setString(1, change.collection)
+        changelogStmt.setString(2, change.id)
+        changelogStmt.setInt(3, change.type.ordinal)
+        changelogStmt.setBytes(4, change.payload)
+        changelogStmt.setString(5, change.hlcTimestamp)
+        changelogStmt.setLong(6, physicalTime)
+        changelogStmt.setInt(7, logicalCounter)
+        changelogStmt.setString(8, originNode)
+        changelogStmt.setLong(9, now)
+        changelogStmt.executeUpdate()
+        updateMaxSeenHlc(change.hlcTimestamp)
     }
 
     override suspend fun compact(pruneHlcThreshold: String) = withContext(Dispatchers.IO) {

@@ -47,7 +47,6 @@ class AssemblyBuffer(
         val decoded = FragmentHeader.decode(fragmentPacket.payload) ?: return null
         val (header, chunk) = decoded
 
-        // Validate total and index bounds
         if (header.total <= 0 || header.index < 0 || header.index >= header.total) return null
 
         cleanExpired()
@@ -55,30 +54,28 @@ class AssemblyBuffer(
         synchronized(assemblies) {
             val assembly = assemblies.getOrPut(header.fragmentId) {
                 if (assemblies.size >= maxConcurrentAssemblies) {
-                    // Evict oldest
-                    val oldestKey = assemblies.minByOrNull { it.value.createdAt }?.key
-                    if (oldestKey != null) assemblies.remove(oldestKey)
+                    assemblies.minByOrNull { it.value.createdAt }?.key?.let { assemblies.remove(it) }
                 }
                 InFlightAssembly(header.fragmentId, header.total, arrayOfNulls(header.total))
             }
 
-            if (header.index < assembly.total && assembly.fragments[header.index] == null) {
-                assembly.fragments[header.index] = chunk
-                assembly.receivedCount++
-
-                if (assembly.receivedCount == assembly.total) {
-                    assemblies.remove(header.fragmentId)
-
-                    val output = ByteArrayOutputStream()
-                    for (part in assembly.fragments) {
-                        if (part == null) return null // Safety check
-                        output.write(part)
-                    }
-
-                    val fullData = output.toByteArray()
-                    return BinaryCodec.decode(fullData, clusterKey = clusterKey)
-                }
+            if (header.index >= assembly.total || assembly.fragments[header.index] != null) {
+                return null
             }
+
+            assembly.fragments[header.index] = chunk
+            assembly.receivedCount++
+            if (assembly.receivedCount != assembly.total) {
+                return null
+            }
+
+            assemblies.remove(header.fragmentId)
+            val output = ByteArrayOutputStream()
+            for (part in assembly.fragments) {
+                if (part == null) return null
+                output.write(part)
+            }
+            return BinaryCodec.decode(output.toByteArray(), clusterKey = clusterKey)
         }
 
         return null

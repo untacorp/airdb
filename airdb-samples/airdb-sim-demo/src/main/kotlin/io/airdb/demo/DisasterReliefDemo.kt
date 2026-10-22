@@ -35,14 +35,12 @@ fun main() = runBlocking {
 
     val network = SimulatedNetwork()
 
-    // Initialize Posko A (Medical Triage Outpost backed by durable SQLite engine)
     val dbFileA = File("build/demo-db/posko-medis.sqlite")
     if (dbFileA.exists()) dbFileA.delete()
     val dbA = SqliteDbAdapter.open(dbFileA)
     val transportA = SimulatedTransport("posko-medis-merapi", network)
     val engineA = AirDbEngine("posko-medis-merapi", dbA, transportA)
 
-    // Initialize Posko B (Logistics & Evacuation Camp backed by Memory adapter)
     val dbB = MemoryDbAdapter()
     val transportB = SimulatedTransport("posko-logistik-selo", network)
     val engineB = AirDbEngine("posko-logistik-selo", dbB, transportB)
@@ -123,7 +121,6 @@ fun main() = runBlocking {
     engineB.stop()
     dbA.close()
 
-    // Reopen database directly from disk file to verify persistence
     val rebootedDbA = SqliteDbAdapter.open(dbFileA)
     val persistedSurvivors = rebootedDbA.getActiveRecords("survivors")
     println(" - Rebooted Posko Medis retrieved ${persistedSurvivors.size} survivors from SQLite disk:")

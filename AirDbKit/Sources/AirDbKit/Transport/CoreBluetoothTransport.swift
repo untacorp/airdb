@@ -175,21 +175,20 @@ public final class CoreBluetoothTransport: NSObject, AirDbTransport, @unchecked 
                         ? BinaryCodec.encode(fragment)
                         : BinaryCodec.encode(fragment, clusterKey: currentKey)
 
-                    // 1. Send to matching connected Peripherals (as Central)
                     for (uuid, entry) in self.activePeripherals {
-                        let peerId = uuid.uuidString
-                        if targetPeerId == nil || targetPeerId == peerId {
+                        if targetPeerId == nil || targetPeerId == uuid.uuidString {
                             self.enqueueCentralWrite(data: encoded, peripheral: entry.peripheral, characteristic: entry.characteristic)
                             sentAny = true
                         }
                     }
 
-                    // 2. Send to matching subscribed Centrals (as Peripheral)
                     if !self.subscribedCentrals.isEmpty {
-                        if targetPeerId == nil {
-                            self.enqueuePeripheralNotification(data: encoded)
-                            sentAny = true
-                        } else if let uuid = UUID(uuidString: targetPeerId!), self.subscribedCentrals[uuid] != nil {
+                        if let target = targetPeerId {
+                            if let uuid = UUID(uuidString: target), self.subscribedCentrals[uuid] != nil {
+                                self.enqueuePeripheralNotification(data: encoded)
+                                sentAny = true
+                            }
+                        } else {
                             self.enqueuePeripheralNotification(data: encoded)
                             sentAny = true
                         }
@@ -200,8 +199,6 @@ public final class CoreBluetoothTransport: NSObject, AirDbTransport, @unchecked 
             }
         }
     }
-
-    // MARK: - Central Transmission & Backpressure
 
     private func enqueueCentralWrite(data: Data, peripheral: CBPeripheral, characteristic: CBCharacteristic) {
         let uuid = peripheral.identifier
@@ -228,8 +225,6 @@ public final class CoreBluetoothTransport: NSObject, AirDbTransport, @unchecked 
         pendingCentralWrites[uuid] = queue
     }
 
-    // MARK: - Peripheral Transmission & Backpressure
-
     private func enqueuePeripheralNotification(data: Data) {
         guard let pManager = peripheralManager, let char = localCharacteristic else { return }
 
@@ -248,18 +243,11 @@ public final class CoreBluetoothTransport: NSObject, AirDbTransport, @unchecked 
     private func drainPeripheralNotifications() {
         guard let pManager = peripheralManager, let char = localCharacteristic else { return }
 
-        while !pendingSubscriberNotifications.isEmpty {
-            let nextData = pendingSubscriberNotifications[0]
-            let success = pManager.updateValue(nextData, for: char, onSubscribedCentrals: nil)
-            if success {
-                pendingSubscriberNotifications.removeFirst()
-            } else {
-                break
-            }
+        while let nextData = pendingSubscriberNotifications.first {
+            guard pManager.updateValue(nextData, for: char, onSubscribedCentrals: nil) else { break }
+            pendingSubscriberNotifications.removeFirst()
         }
     }
-
-    // MARK: - Ingestion & Reassembly
 
     private func handleInboundData(_ data: Data, peerId: String, linkId: String) {
         let currentKey = lock.withScopedLock { self.clusterKey }
@@ -293,8 +281,6 @@ public final class CoreBluetoothTransport: NSObject, AirDbTransport, @unchecked 
         )
     }
 }
-
-// MARK: - CBCentralManagerDelegate & CBPeripheralDelegate
 
 extension CoreBluetoothTransport: CBCentralManagerDelegate, CBPeripheralDelegate {
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
@@ -376,8 +362,6 @@ extension CoreBluetoothTransport: CBCentralManagerDelegate, CBPeripheralDelegate
         drainCentralWrites(for: peripheral)
     }
 }
-
-// MARK: - CBPeripheralManagerDelegate
 
 extension CoreBluetoothTransport: CBPeripheralManagerDelegate {
     public func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {

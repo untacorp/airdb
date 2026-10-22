@@ -134,67 +134,49 @@ class SyncSession(
                 }
             }
 
-            PacketType.DELTA_BATCH -> {
-                scope.launch {
-                    val changes = DeltaBatch.deserialize(packet.payload)
-                    if (changes.isNotEmpty()) {
-                        val validChanges = if (enforceSignatures) {
-                            changes.filter { it.verifySignature() }
-                        } else {
-                            changes
-                        }
-
-                        if (validChanges.isNotEmpty()) {
-                            // Advance local clock based on highest incoming change HLC
-                            val maxHlcRecord = validChanges.maxWithOrNull(Comparator.comparing({ it.hlcTimestamp }, HlcComparator))
-                            if (maxHlcRecord != null) {
-                                val parsed = HlcTimestamp.parseOrNull(maxHlcRecord.hlcTimestamp)
-                                if (parsed != null) {
-                                    clock.update(parsed)
-                                }
-                            }
-
-                            // Update local vector clock for each incoming change
-                            for (change in validChanges) {
-                                val origin = HlcComparator.extractNodeId(change.hlcTimestamp) ?: ""
-                                if (origin.isNotEmpty()) {
-                                    vectorClock.update(origin, change.hlcTimestamp)
-                                }
-                            }
-
-                            // Apply to database
-                            adapter.applyChanges(validChanges)
-                            onSyncCompleted(peerId, validChanges.size)
-                        }
-                    }
-
-                    // Acknowledge receipt
-                    val ack = AirDbPacket(
-                        type = PacketType.DELTA_ACK,
-                        senderId = localNodeId,
-                        payload = byteArrayOf()
-                    )
-                    transport.send(ack, targetPeerId = peerId)
-                }
-            }
+            PacketType.DELTA_BATCH -> handleDeltaBatch(packet)
 
             PacketType.DELTA_ACK -> {
                 val sent = lastSentBatch
-                if (sent != null && sent.isNotEmpty()) {
+                if (sent.isNullOrEmpty()) {
+                    currentState = State.SYNCHRONIZED
+                } else {
                     for (change in sent) {
                         val origin = HlcComparator.extractNodeId(change.hlcTimestamp) ?: localNodeName
                         peerVectorClock.update(origin, change.hlcTimestamp)
                     }
                     lastSentBatch = null
-                    scope.launch {
-                        streamDeltasToPeer()
-                    }
-                } else {
-                    currentState = State.SYNCHRONIZED
+                    scope.launch { streamDeltasToPeer() }
                 }
             }
 
             else -> Unit
+        }
+    }
+
+    private fun handleDeltaBatch(packet: AirDbPacket) {
+        scope.launch {
+            val raw = DeltaBatch.deserialize(packet.payload)
+            val changes = if (enforceSignatures) raw.filter { it.verifySignature() } else raw
+            if (changes.isNotEmpty()) {
+                val maxRecord = changes.maxWithOrNull(Comparator.comparing({ it.hlcTimestamp }, HlcComparator))
+                maxRecord?.let { HlcTimestamp.parseOrNull(it.hlcTimestamp) }?.let { clock.update(it) }
+
+                for (change in changes) {
+                    val origin = HlcComparator.extractNodeId(change.hlcTimestamp) ?: ""
+                    if (origin.isNotEmpty()) vectorClock.update(origin, change.hlcTimestamp)
+                }
+
+                adapter.applyChanges(changes)
+                onSyncCompleted(peerId, changes.size)
+            }
+
+            val ack = AirDbPacket(
+                type = PacketType.DELTA_ACK,
+                senderId = localNodeId,
+                payload = byteArrayOf()
+            )
+            transport.send(ack, targetPeerId = peerId)
         }
     }
 

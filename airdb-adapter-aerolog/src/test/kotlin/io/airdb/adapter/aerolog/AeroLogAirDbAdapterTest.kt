@@ -40,7 +40,6 @@ class AeroLogAirDbAdapterTest {
     fun testFilePersistenceAcrossRestarts(@TempDir tempDir: Path) = runBlocking {
         val dbDir = File(tempDir.toFile(), "aerolog_data")
 
-        // Phase 1: Open and write records
         AeroLogAirDbAdapter.open(dbDir, nodeId = "node-alpha").use { adapter ->
             val record1 = ChangeRecord(
                 id = "item-101",
@@ -56,7 +55,6 @@ class AeroLogAirDbAdapterTest {
             assertEquals("First Aid Kit", String(retrieved!!.payload))
         }
 
-        // Database is closed now. Phase 2: Re-open the database directory
         AeroLogAirDbAdapter.open(dbDir, nodeId = "node-alpha").use { adapter ->
             val retrieved = adapter.getActiveRecord("supplies", "item-101")
             assertNotNull(retrieved)
@@ -73,7 +71,6 @@ class AeroLogAirDbAdapterTest {
     fun testLwwReconciliation(@TempDir tempDir: Path) = runBlocking {
         val dbDir = File(tempDir.toFile(), "aerolog_lww")
         AeroLogAirDbAdapter.open(dbDir).use { adapter ->
-            // Initial insert
             val rec1 = ChangeRecord(
                 id = "doc-1",
                 collection = "records",
@@ -84,7 +81,6 @@ class AeroLogAirDbAdapterTest {
             adapter.applyChanges(listOf(rec1))
             assertEquals("Version 1", String(adapter.getActiveRecord("records", "doc-1")!!.payload))
 
-            // Newer mutation (counter 10 > 2 numerically)
             val rec2 = ChangeRecord(
                 id = "doc-1",
                 collection = "records",
@@ -95,7 +91,6 @@ class AeroLogAirDbAdapterTest {
             adapter.applyChanges(listOf(rec2))
             assertEquals("Version 2", String(adapter.getActiveRecord("records", "doc-1")!!.payload))
 
-            // Stale mutation (counter 1 < 10) must be rejected
             val recStale = ChangeRecord(
                 id = "doc-1",
                 collection = "records",
@@ -112,7 +107,6 @@ class AeroLogAirDbAdapterTest {
     fun testTombstoneAndCompaction(@TempDir tempDir: Path) = runBlocking {
         val dbDir = File(tempDir.toFile(), "aerolog_tombstones")
         AeroLogAirDbAdapter.open(dbDir).use { adapter ->
-            // Insert
             val rec = ChangeRecord(
                 id = "item-del",
                 collection = "inventory",
@@ -124,7 +118,6 @@ class AeroLogAirDbAdapterTest {
             assertNotNull(adapter.getActiveRecord("inventory", "item-del"))
             assertFalse(adapter.isRecordDeleted("inventory", "item-del"))
 
-            // Soft-delete (tombstone)
             val recDel = ChangeRecord(
                 id = "item-del",
                 collection = "inventory",
@@ -137,7 +130,6 @@ class AeroLogAirDbAdapterTest {
             assertNull(adapter.getActiveRecord("inventory", "item-del"))
             assertTrue(adapter.isRecordDeleted("inventory", "item-del"))
 
-            // Trigger compaction
             adapter.compact("2000-1-nodeA")
             assertNull(adapter.getActiveRecord("inventory", "item-del"))
         }
@@ -170,7 +162,6 @@ class AeroLogAirDbAdapterTest {
             )
             adapter.applyChanges(listOf(rec1, rec2, rec3))
 
-            // Query changes strictly newer than e1
             val delta = adapter.getChangesSince("1000-0-nodeA")
             assertEquals(2, delta.size)
             assertEquals("e2", delta[0].id)
@@ -194,11 +185,9 @@ class AeroLogAirDbAdapterTest {
         val engine1 = AirDbEngine("node-1", adapter1, transport1)
         val engine2 = AirDbEngine("node-2", adapter2, transport2)
 
-        // Node 1 creates a record offline
         val payload = "Autonomous Mesh Sync via AeroLog".toByteArray()
         engine1.saveRecord("messages", "msg-42", MutationType.INSERT, payload)
 
-        // Verify Node 2 doesn't have it yet
         assertNull(adapter2.getActiveRecord("messages", "msg-42"))
 
         val latch = CountDownLatch(1)
@@ -208,25 +197,20 @@ class AeroLogAirDbAdapterTest {
             }
         }
 
-        // Start engines - SimulatedNetwork connects peers in range
         engine1.start()
         engine2.start()
 
-        // Wait for P2P BLE replication
         assertTrue(latch.await(5, TimeUnit.SECONDS), "P2P sync between AeroLog nodes timed out")
 
-        // Verify Node 2 now has the record replicated from Node 1
         val syncedRecord = adapter2.getActiveRecord("messages", "msg-42")
         assertNotNull(syncedRecord)
         assertEquals("Autonomous Mesh Sync via AeroLog", String(syncedRecord!!.payload))
 
-        // Clean shutdown
         engine1.stop()
         engine2.stop()
         adapter1.close()
         adapter2.close()
 
-        // Reopen Node 2 from disk to verify persistence of the replicated record
         AeroLogAirDbAdapter.open(dirNode2, "node-2").use { reloadedAdapter2 ->
             val persisted = reloadedAdapter2.getActiveRecord("messages", "msg-42")
             assertNotNull(persisted)
@@ -238,7 +222,6 @@ class AeroLogAirDbAdapterTest {
     fun testHistoricalChangelogRangeScanDoesNotSkipRecords(@TempDir tempDir: Path) = runBlocking {
         val dbDir = File(tempDir.toFile(), "aerolog_pagination")
         AeroLogAirDbAdapter.open(dbDir).use { adapter ->
-            // Insert 150 records, exceeding the old hardcoded 100-entry tail fetch limit
             val records = (0 until 150).map { i ->
                 ChangeRecord(
                     id = "item-$i",
@@ -250,19 +233,16 @@ class AeroLogAirDbAdapterTest {
             }
             adapter.applyChanges(records)
 
-            // 1. Initial page (since null, limit 20) must return the OLDEST 20 records (item-0 through item-19)
             val page1 = adapter.readChangelogSince(null, limit = 20)
             assertEquals(20, page1.size)
             assertEquals("item-0", page1.first().id)
             assertEquals("item-19", page1.last().id)
 
-            // 2. Second page must continue monotonically without skipping records
             val page2 = adapter.readChangelogSince(page1.last().hlcTimestamp, limit = 20)
             assertEquals(20, page2.size)
             assertEquals("item-20", page2.first().id)
             assertEquals("item-39", page2.last().id)
 
-            // 3. Range scan from an intermediate HLC
             val midScan = adapter.readChangelogSince("1099-0-nodeA", limit = 10)
             assertEquals(10, midScan.size)
             assertEquals("item-100", midScan.first().id)

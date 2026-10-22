@@ -175,42 +175,25 @@ public actor SyncSession {
 
         case .deltaBatch:
             let changes = DeltaBatch.deserialize(packet.payload)
-            if !changes.isEmpty {
-                let validChanges: [ChangeRecord]
-                if enforceSignatures {
-                    validChanges = changes.filter { $0.verifySignature() }
-                } else {
-                    validChanges = changes
+            let valid = enforceSignatures ? changes.filter { $0.verifySignature() } : changes
+            if !valid.isEmpty {
+                if let maxHlc = valid.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })?.hlcTimestamp,
+                   let parsed = HlcTimestamp.parse(maxHlc) {
+                    _ = clock.update(remote: parsed)
                 }
 
-                if !validChanges.isEmpty {
-                    // Advance local clock based on highest incoming change HLC
-                    let maxHlcRecord = validChanges.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })
-                    if let maxHlc = maxHlcRecord?.hlcTimestamp, let parsed = HlcTimestamp.parse(maxHlc) {
-                        _ = clock.update(remote: parsed)
+                for change in valid {
+                    if let origin = HlcComparator.extractNodeId(from: change.hlcTimestamp) {
+                        vectorClock.update(nodeId: origin, hlcTimestamp: change.hlcTimestamp)
                     }
+                }
 
-                    // Update local vector clock for each incoming change
-                    for change in validChanges {
-                        if let origin = HlcComparator.extractNodeId(from: change.hlcTimestamp) {
-                            vectorClock.update(nodeId: origin, hlcTimestamp: change.hlcTimestamp)
-                        }
-                    }
-
-                    do {
-                        try await adapter.applyChanges(validChanges)
-                        onSyncCompleted(peerId, validChanges.count)
-                    } catch {
-                        // Log or handle adapter error
-                    }
+                if (try? await adapter.applyChanges(valid)) != nil {
+                    onSyncCompleted(peerId, valid.count)
                 }
             }
 
-            let ack = AirDbPacket(
-                type: .deltaAck,
-                senderId: localNodeId,
-                payload: Data()
-            )
+            let ack = AirDbPacket(type: .deltaAck, senderId: localNodeId, payload: Data())
             _ = await transport.send(packet: ack, targetPeerId: peerId)
 
         case .deltaAck:
@@ -248,10 +231,7 @@ public actor SyncSession {
             let signedChanges: [ChangeRecord]
             if let keyPair = authorKeyPair {
                 signedChanges = missingChanges.map { change in
-                    if !change.isSigned {
-                        return (try? change.signed(with: keyPair)) ?? change
-                    }
-                    return change
+                    change.isSigned ? change : ((try? change.signed(with: keyPair)) ?? change)
                 }
             } else {
                 signedChanges = missingChanges

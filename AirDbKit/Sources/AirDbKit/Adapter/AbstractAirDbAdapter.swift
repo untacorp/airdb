@@ -96,15 +96,12 @@ public actor AdaptiveAirDbAdapter: AirDbAdapter {
 
             for record in batch {
                 let origin = HlcComparator.extractNodeId(from: record.hlcTimestamp) ?? ""
-                if let peerKnown = peerClock[origin] {
-                    if HlcComparator.compare(record.hlcTimestamp, peerKnown) == .orderedDescending {
-                        missing.append(record)
-                        if missing.count >= limit { break }
-                    }
-                } else {
-                    missing.append(record)
-                    if missing.count >= limit { break }
+                if let peerKnown = peerClock[origin],
+                   HlcComparator.compare(record.hlcTimestamp, peerKnown) != .orderedDescending {
+                    continue
                 }
+                missing.append(record)
+                if missing.count >= limit { break }
             }
 
             if batch.count < pageSize { break }
@@ -120,11 +117,9 @@ public actor AdaptiveAirDbAdapter: AirDbAdapter {
             for change in changes {
                 let existing = try await self.storage.readEntity(collection: change.collection, id: change.id)
 
-                // Last-Write-Wins (LWW) comparison via canonical HLC total order
-                if let existing = existing {
-                    if HlcComparator.compare(change.hlcTimestamp, existing.hlcTimestamp) != .orderedDescending {
-                        continue // Discard stale mutation
-                    }
+                if let existing = existing,
+                   HlcComparator.compare(change.hlcTimestamp, existing.hlcTimestamp) != .orderedDescending {
+                    continue
                 }
 
                 let entity = StoredEntity(
@@ -147,11 +142,11 @@ public actor AdaptiveAirDbAdapter: AirDbAdapter {
     private var maxSeenHlc: String?
 
     private func updateMaxSeenHlc(_ hlc: String) {
-        if let current = maxSeenHlc {
-            if HlcComparator.compare(hlc, current) == .orderedDescending {
-                maxSeenHlc = hlc
-            }
-        } else {
+        guard let current = maxSeenHlc else {
+            maxSeenHlc = hlc
+            return
+        }
+        if HlcComparator.compare(hlc, current) == .orderedDescending {
             maxSeenHlc = hlc
         }
     }
@@ -169,11 +164,7 @@ public actor AdaptiveAirDbAdapter: AirDbAdapter {
             let batch = try await storage.readChangelogSince(sinceHlcTimestamp: cursor, limit: pageSize)
             if batch.isEmpty { break }
             for record in batch {
-                if let current = maxHlc {
-                    if HlcComparator.compare(record.hlcTimestamp, current) == .orderedDescending {
-                        maxHlc = record.hlcTimestamp
-                    }
-                } else {
+                if maxHlc == nil || HlcComparator.compare(record.hlcTimestamp, maxHlc!) == .orderedDescending {
                     maxHlc = record.hlcTimestamp
                 }
             }

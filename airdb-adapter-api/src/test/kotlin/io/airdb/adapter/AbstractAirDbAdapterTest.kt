@@ -56,19 +56,16 @@ class AbstractAirDbAdapterTest {
     fun testLwwReconciliation() = runBlocking {
         val adapter = MockCustomStoreAdapter()
 
-        // Mutation 1: initial insert
         val rec1 = ChangeRecord("doc-1", "users", MutationType.INSERT, "{\"v\":1}".toByteArray(), "1000-2-nodeA")
         adapter.applyChanges(listOf(rec1))
 
         assertEquals("{\"v\":1}", String(adapter.readEntity("users", "doc-1")!!.payload))
 
-        // Mutation 2: newer counter (10 > 2 numerically)
         val rec2 = ChangeRecord("doc-1", "users", MutationType.UPDATE, "{\"v\":2}".toByteArray(), "1000-10-nodeA")
         adapter.applyChanges(listOf(rec2))
 
         assertEquals("{\"v\":2}", String(adapter.readEntity("users", "doc-1")!!.payload))
 
-        // Mutation 3: stale update (1 < 10)
         val recStale = ChangeRecord("doc-1", "users", MutationType.UPDATE, "{\"v\":stale}".toByteArray(), "1000-1-nodeA")
         adapter.applyChanges(listOf(recStale))
 
@@ -79,21 +76,17 @@ class AbstractAirDbAdapterTest {
     fun testTombstoneAntiResurrection() = runBlocking {
         val adapter = MockCustomStoreAdapter()
 
-        // Insert
         val insertRec = ChangeRecord("item-1", "inventory", MutationType.INSERT, "tent".toByteArray(), "1000-0-nodeA")
         adapter.applyChanges(listOf(insertRec))
         assertEquals(MutationType.INSERT, adapter.readEntity("inventory", "item-1")!!.type)
 
-        // Delete (tombstone)
         val deleteRec = ChangeRecord("item-1", "inventory", MutationType.DELETE, ByteArray(0), "1000-5-nodeA")
         adapter.applyChanges(listOf(deleteRec))
         assertEquals(MutationType.DELETE, adapter.readEntity("inventory", "item-1")!!.type)
 
-        // Late arriving insert with older HLC
         val lateInsert = ChangeRecord("item-1", "inventory", MutationType.INSERT, "tent-resurrected".toByteArray(), "1000-2-nodeA")
         adapter.applyChanges(listOf(lateInsert))
 
-        // Must remain deleted (anti-resurrection guaranteed)
         assertEquals(MutationType.DELETE, adapter.readEntity("inventory", "item-1")!!.type)
     }
 
@@ -109,31 +102,24 @@ class AbstractAirDbAdapterTest {
             )
         )
 
-        // Peer knows up to 1000-0-nodeA and nothing from nodeB
         val peerClock = mapOf("nodeA" to "1000-0-nodeA")
         val missing = adapter.getMissingChanges(peerClock)
 
         assertEquals(2, missing.size)
-        assertTrue(missing.any { it.id == "doc-2" }) // 1005 > 1000
-        assertTrue(missing.any { it.id == "doc-3" }) // nodeB unknown to peer
+        assertTrue(missing.any { it.id == "doc-2" })
+        assertTrue(missing.any { it.id == "doc-3" })
     }
 
     @Test
     fun testDataStarvationPaginationBeyondLimit() = runBlocking {
         val adapter = MockCustomStoreAdapter()
 
-        // Create 250 records from nodeA (HLC: 1000-0-nodeA to 1000-249-nodeA)
         val initialBatch = (0 until 250).map { i ->
             ChangeRecord("doc-$i", "items", MutationType.INSERT, "v".toByteArray(), "1000-$i-nodeA")
         }
         adapter.applyChanges(initialBatch)
 
-        // Peer already knows up to record 199 (HLC 1000-199-nodeA)
         val peerClock = mapOf("nodeA" to "1000-199-nodeA")
-
-        // With small limit of 20, the old implementation would read 0..39 (null, limit = 40),
-        // find that all 40 are <= 199, and return EMPTY LIST (data starvation).
-        // The fixed implementation pages through until it finds records 200..219.
         val missing = adapter.getMissingChanges(peerClock, limit = 20)
 
         assertEquals(20, missing.size, "Must page past older records to find new changes")
