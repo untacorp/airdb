@@ -77,6 +77,18 @@ object Ed25519Signer {
         0x04.toByte(), 0x22.toByte(), 0x04.toByte(), 0x20.toByte()
     )
 
+    private val keyFactory: KeyFactory by lazy {
+        KeyFactory.getInstance("Ed25519")
+    }
+
+    private val signEngine = ThreadLocal.withInitial {
+        Signature.getInstance("Ed25519")
+    }
+
+    private val verifyEngine = ThreadLocal.withInitial {
+        Signature.getInstance("Ed25519")
+    }
+
     /**
      * Generates a fresh random Ed25519 key pair.
      */
@@ -111,10 +123,9 @@ object Ed25519Signer {
             System.arraycopy(PKCS8_ED25519_PREFIX, 0, pkcs8Bytes, 0, PKCS8_ED25519_PREFIX.size)
             System.arraycopy(privateKeyRaw, 0, pkcs8Bytes, PKCS8_ED25519_PREFIX.size, PRIVATE_KEY_SIZE)
 
-            val keyFactory = KeyFactory.getInstance("Ed25519")
             val privateKey = keyFactory.generatePrivate(PKCS8EncodedKeySpec(pkcs8Bytes))
 
-            val signature = Signature.getInstance("Ed25519")
+            val signature = signEngine.get()
             signature.initSign(privateKey)
             signature.update(message)
             val sig = signature.sign()
@@ -144,10 +155,9 @@ object Ed25519Signer {
             System.arraycopy(X509_ED25519_PREFIX, 0, x509Bytes, 0, X509_ED25519_PREFIX.size)
             System.arraycopy(publicKeyRaw, 0, x509Bytes, X509_ED25519_PREFIX.size, PUBLIC_KEY_SIZE)
 
-            val keyFactory = KeyFactory.getInstance("Ed25519")
             val publicKey = keyFactory.generatePublic(X509EncodedKeySpec(x509Bytes))
 
-            val verifier = Signature.getInstance("Ed25519")
+            val verifier = verifyEngine.get()
             verifier.initVerify(publicKey)
             verifier.update(message)
             verifier.verify(signature)

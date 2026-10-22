@@ -28,7 +28,7 @@ import io.airdb.crypto.Ed25519KeyPair
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -82,7 +82,7 @@ class AirDbEngine(
         isStarted = false
         transport.stop()
         sessions.clear()
-        scope.cancel()
+        scope.coroutineContext.cancelChildren()
     }
 
     /**

@@ -74,4 +74,33 @@ class HybridLogicalClockTest {
         val parsed = HlcTimestamp.parse(original.toString())
         assertEquals(original, parsed)
     }
+
+    @Test
+    fun testConcurrentClockMonotonicity() {
+        val clock = HybridLogicalClock("node-concurrent")
+        val threadCount = 8
+        val iterationsPerThread = 500
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(threadCount)
+        val timestamps = java.util.concurrent.ConcurrentLinkedQueue<HlcTimestamp>()
+        val latch = java.util.concurrent.CountDownLatch(threadCount)
+
+        for (i in 0 until threadCount) {
+            executor.submit {
+                try {
+                    for (j in 0 until iterationsPerThread) {
+                        timestamps.add(clock.now())
+                    }
+                } finally {
+                    latch.countDown()
+                }
+            }
+        }
+
+        assertTrue(latch.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        executor.shutdown()
+
+        assertEquals(threadCount * iterationsPerThread, timestamps.size)
+        val uniqueCount = timestamps.map { it.toString() }.toSet().size
+        assertEquals(timestamps.size, uniqueCount, "Duplicate timestamps generated concurrently")
+    }
 }
