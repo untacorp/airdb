@@ -856,6 +856,8 @@
       
         
       
+        
+      
     
     
     
@@ -924,6 +926,34 @@
     
   
     Built-in SQLite Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="manual/persistence/aerolog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AeroLog Bitcask Engine
   
 
     
@@ -1969,7 +1999,7 @@
 
     subgraph PersistenceTier ["Persistence Layer (Pluggable Seam)"]
         SQLite["airdb-adapter-sqlite&lt;br/&gt;(SqliteDbAdapter)&lt;br/&gt;WAL Mode • Changelog Index&lt;br/&gt;Tombstone Soft-Deletes"]
-        BYOD["Bring Your Own Database&lt;br/&gt;(BYOD Adapters)&lt;br/&gt;Room • SQLDelight • GRDB&lt;br/&gt;SwiftData • In-Memory KV"]
+        BYOD["Bring Your Own Database&lt;br/&gt;(BYOD Adapters)&lt;br/&gt;AeroLog • Room • GRDB&lt;br/&gt;SQLDelight • SwiftData"]
     end
 
     subgraph EngineTier ["Reconciliation &amp; Causality Core"]

@@ -758,6 +758,8 @@
       
         
       
+        
+      
     
     
     
@@ -824,6 +826,34 @@
     
   
     Built-in SQLite Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="aerolog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AeroLog Bitcask Engine
   
 
     
@@ -1902,14 +1932,15 @@
 <p>Write throughput across persistence adapters when ingesting 128-byte delta batches on modern mobile hardware:</p>
 <pre class="mermaid"><code>xychart-beta
     title "Local Persistence Write Throughput (Ops/Sec)"
-    x-axis ["SQLite (WAL)", "Jetpack Room", "Apple SqliteDbAdapter", "In-Memory KV"]
-    y-axis "Write Throughput (ops/sec)" 0 --&gt; 35000
-    bar [14200, 11800, 16500, 31200]</code></pre>
+    x-axis ["SQLite WAL", "Jetpack Room", "Apple Sqlite", "In-Memory KV", "AeroLog Bitcask"]
+    y-axis "Write Throughput (ops/sec)" 0 --&gt; 250000
+    bar [14200, 11800, 16500, 31200, 219800]</code></pre>
 <hr />
 <h2 id="available-storage-guides">Available Storage Guides</h2>
 <p>Follow our dedicated guides for your platform's preferred storage engine:</p>
 <ul>
 <li><strong><a href="sqlite/">Built-in SQLite Engine</a></strong>: Production WAL-mode SQLite storage on Android and Apple.</li>
+<li><strong><a href="aerolog/">AeroLog Bitcask Engine</a></strong>: High-throughput, sequential append-only Bitcask log engine (&gt;200,000 writes/sec) in pure Rust with native HLC causality.</li>
 <li><strong><a href="room/">Android Jetpack Room</a></strong>: Step-by-step Room database integration with entities, DAOs, and changelog tables.</li>
 <li><strong><a href="sqldelight/">SQLDelight Multiplatform</a></strong>: Type-safe SQLDelight schema setup for shared Kotlin code.</li>
 <li><strong><a href="apple-sqlite/">Apple Native SQLite</a></strong>: Fast, zero-dependency <code>libsqlite3</code> setup on iOS and macOS.</li>

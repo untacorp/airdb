@@ -756,6 +756,8 @@
       
         
       
+        
+      
     
     
     
@@ -824,6 +826,34 @@
     
   
     Built-in SQLite Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="persistence/aerolog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AeroLog Bitcask Engine
   
 
     
@@ -1784,7 +1814,7 @@
 <p>AirDB is structured into five distinct, decoupled layers:</p>
 <pre class="mermaid"><code>flowchart TD
     L1["&lt;b&gt;1. Application Layer&lt;/b&gt;&lt;br/&gt;Domain Entities • Disaster Triage&lt;br/&gt;POS Registers • Sensor &amp; Audit Logs"]
-    L2["&lt;b&gt;2. Persistence Seam (AirDbAdapter)&lt;/b&gt;&lt;br/&gt;• Durable SQLite with WAL mode&lt;br/&gt;• Out-of-the-box Android &amp; Apple support&lt;br/&gt;• Pluggable: Room, SQLDelight, GRDB, SwiftData"]
+    L2["&lt;b&gt;2. Persistence Seam (AirDbAdapter)&lt;/b&gt;&lt;br/&gt;• Durable SQLite with WAL mode&lt;br/&gt;• Out-of-the-box Android &amp; Apple support&lt;br/&gt;• Pluggable: AeroLog, Room, GRDB, SQLDelight"]
     L3["&lt;b&gt;3. Causality &amp; Synchronization Core&lt;/b&gt;&lt;br/&gt;• Hybrid Logical Clocks for deterministic ordering&lt;br/&gt;• Vector Clocks for peer delta tracking&lt;br/&gt;• 4-Phase Sync Protocol (Handshake, Delta, Ack)&lt;br/&gt;• Last-Write-Wins conflict resolution &amp; tombstones"]
     L4["&lt;b&gt;4. Zero-Trust Cryptographic Mesh&lt;/b&gt;&lt;br/&gt;• RFC 8439 ChaCha20-Poly1305 AEAD encryption&lt;br/&gt;• Header AAD binding for instant tamper rejection&lt;br/&gt;• RFC 8032 Ed25519 author digital signatures&lt;br/&gt;• RFC 5869 HKDF-SHA256 key derivation schedule"]
     L5["&lt;b&gt;5. Wire Codecs &amp; Radio Transports&lt;/b&gt;&lt;br/&gt;• Binary framing &amp; zlib Deflate compression&lt;br/&gt;• MTU chunking with 30s sliding AssemblyBuffer&lt;br/&gt;• Dual-role BLE concurrency (Central + Peripheral)&lt;br/&gt;• Android single-flight queue &amp; Apple actor&lt;br/&gt;• Sans-I/O in-memory simulator for unit tests"]
@@ -1796,7 +1826,7 @@
 <hr />
 <h2 id="manual-chapters">Manual Chapters</h2>
 <ul>
-<li><strong><a href="persistence/">Storage &amp; Bring Your Own Database (BYOD)</a></strong>: How AirDB interacts with local storage engines, and guides for SQLite, Room, SQLDelight, GRDB, SwiftData, and CoreData.</li>
+<li><strong><a href="persistence/">Storage &amp; Bring Your Own Database (BYOD)</a></strong>: How AirDB interacts with local storage engines, and guides for SQLite, AeroLog (Bitcask), Room, SQLDelight, GRDB, SwiftData, and CoreData.</li>
 <li><strong><a href="causality/how-sync-works/">How Synchronization Works</a></strong>: Deep dive into Hybrid Logical Clocks (HLC), vector clocks, the 4-phase synchronization handshake, and tombstone lifecycle.</li>
 <li><strong><a href="cryptography/security-mesh/">Security &amp; Cryptographic Mesh</a></strong>: How AirDB secures data over the air using ChaCha20-Poly1305 and guarantees record provenance across untrusted mesh relays with Ed25519 digital signatures.</li>
 <li><strong><a href="networking/wire-and-ble/">Networking &amp; Bluetooth Transports</a></strong>: How packets are framed, compressed, fragmented, and delivered over Bluetooth Low Energy without native driver race conditions.</li>
