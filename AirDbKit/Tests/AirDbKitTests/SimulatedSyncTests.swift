@@ -86,4 +86,37 @@ final class SimulatedSyncTests: XCTestCase {
         engineA.stop()
         engineB.stop()
     }
+
+    func testSyncSessionQueueProcessingAndStop() async throws {
+        let network = SimulatedNetwork()
+        let adapter = MemoryDbAdapter()
+        let transport = SimulatedTransport(nodeId: "node-test", network: network)
+        let clock = HybridLogicalClock(nodeId: "node-test")
+        let vc = VectorClock()
+
+        let session = SyncSession(
+            peerId: "remote-peer",
+            linkId: "link-1",
+            localNodeId: 101,
+            localNodeName: "node-test",
+            adapter: adapter,
+            clock: clock,
+            vectorClock: vc,
+            transport: transport
+        ) { _, _ in }
+
+        // Enqueue handshake packets in FIFO order
+        let handshakePacket = AirDbPacket(
+            type: .handshake,
+            senderId: 202,
+            payload: Data("remote-peer".utf8)
+        )
+        session.enqueue(packet: handshakePacket)
+
+        // Give the sequential queue processor time to execute
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        // Stopping the session cleanly finishes stream and cancels background task
+        session.stop()
+    }
 }

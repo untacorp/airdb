@@ -46,6 +46,9 @@ public actor SyncSession {
     private var isSyncing: Bool = false
     private var lastSentBatch: [ChangeRecord]?
 
+    private let packetContinuation: AsyncStream<AirDbPacket>.Continuation
+    private let processingTask: Task<Void, Never>
+
     public init(
         peerId: String,
         linkId: String,
@@ -72,6 +75,36 @@ public actor SyncSession {
         self.authorKeyPair = authorKeyPair
         self.enforceSignatures = enforceSignatures
         self.onSyncCompleted = onSyncCompleted
+
+        var continuation: AsyncStream<AirDbPacket>.Continuation!
+        let stream = AsyncStream<AirDbPacket> { cont in
+            continuation = cont
+        }
+        self.packetContinuation = continuation
+
+        self.processingTask = Task { [weak self] in
+            for await packet in stream {
+                guard !Task.isCancelled else { break }
+                guard let self = self else { break }
+                await self.processPacket(packet)
+            }
+        }
+    }
+
+    deinit {
+        packetContinuation.finish()
+        processingTask.cancel()
+    }
+
+    /// Enqueues an inbound packet into the session's sequential processing stream.
+    nonisolated public func enqueue(packet: AirDbPacket) {
+        packetContinuation.yield(packet)
+    }
+
+    /// Stops session queue processing and cancels active background tasks.
+    nonisolated public func stop() {
+        packetContinuation.finish()
+        processingTask.cancel()
     }
 
     public func start() async {
@@ -97,6 +130,10 @@ public actor SyncSession {
     }
 
     public func handlePacket(_ packet: AirDbPacket) async {
+        await processPacket(packet)
+    }
+
+    private func processPacket(_ packet: AirDbPacket) async {
         switch packet.type {
         case .handshake:
             let ack = AirDbPacket(

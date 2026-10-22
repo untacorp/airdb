@@ -30,6 +30,7 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
 
     private let lock = NSLock()
     private var sessions: [String: SyncSession] = [:]
+    private var sessionTasks: [String: Task<Void, Never>] = [:]
     private var syncListeners: [@Sendable (String, Int) -> Void] = []
     private var isStarted: Bool = false
 
@@ -83,8 +84,18 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
             return
         }
         isStarted = false
+        let activeSessions = Array(sessions.values)
+        let activeTasks = Array(sessionTasks.values)
         sessions.removeAll()
+        sessionTasks.removeAll()
         lock.unlock()
+
+        for task in activeTasks {
+            task.cancel()
+        }
+        for session in activeSessions {
+            session.stop()
+        }
 
         transport.stop()
     }
@@ -177,18 +188,23 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
                 }
             }
 
-            lock.withScopedLock {
-                sessions[peerId] = session
+            let task = Task { [weak session] in
+                await session?.start()
             }
 
-            Task {
-                await session.start()
+            lock.withScopedLock {
+                sessions[peerId] = session
+                sessionTasks[peerId] = task
             }
 
         case .linkDisconnected(let peerId, _):
-            lock.withScopedLock {
-                sessions.removeValue(forKey: peerId)
+            let (session, task) = lock.withScopedLock {
+                let s = sessions.removeValue(forKey: peerId)
+                let t = sessionTasks.removeValue(forKey: peerId)
+                return (s, t)
             }
+            task?.cancel()
+            session?.stop()
 
         case .packetReceived(let packet, let peerId, let linkId):
             let session = lock.withScopedLock { () -> SyncSession in
@@ -218,9 +234,7 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
                 return s
             }
 
-            Task {
-                await session.handlePacket(packet)
-            }
+            session.enqueue(packet: packet)
 
         default:
             break
