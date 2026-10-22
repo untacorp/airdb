@@ -359,6 +359,30 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                         throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
                     }
                 }
+                // Also purge matching soft-deleted records from airdb_changelog
+                let deleteChangelogSql = "DELETE FROM airdb_changelog WHERE type = ? AND collection = ? AND id = ?"
+                var deleteChangelogStmt: OpaquePointer?
+                defer { sqlite3_finalize(deleteChangelogStmt) }
+
+                if sqlite3_prepare_v2(db, deleteChangelogSql, -1, &deleteChangelogStmt, nil) != SQLITE_OK {
+                    throw SqliteError.prepareFailed(String(cString: sqlite3_errmsg(db)))
+                }
+
+                for item in toDelete {
+                    sqlite3_reset(deleteChangelogStmt)
+                    sqlite3_clear_bindings(deleteChangelogStmt)
+                    sqlite3_bind_int(deleteChangelogStmt, 1, Int32(MutationType.delete.rawValue))
+                    item.collection.withCString { colStr in
+                        item.id.withCString { idStr in
+                            sqlite3_bind_text(deleteChangelogStmt, 2, colStr, -1, sqliteTransient)
+                            sqlite3_bind_text(deleteChangelogStmt, 3, idStr, -1, sqliteTransient)
+                        }
+                    }
+                    if sqlite3_step(deleteChangelogStmt) != SQLITE_DONE {
+                        throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
+                    }
+                }
+
                 try executeSimple("COMMIT TRANSACTION;")
             } catch {
                 try? executeSimple("ROLLBACK TRANSACTION;")
