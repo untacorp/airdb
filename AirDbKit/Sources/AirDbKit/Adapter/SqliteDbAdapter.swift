@@ -446,9 +446,8 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
 
             try executeSimple("COMMIT TRANSACTION;")
         } catch {
-                try? executeSimple("ROLLBACK TRANSACTION;")
-                throw error
-            }
+            try? executeSimple("ROLLBACK TRANSACTION;")
+            throw error
         }
     }
 
