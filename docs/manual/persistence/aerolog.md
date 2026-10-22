@@ -13,8 +13,8 @@ flowchart TD
     App["Application Layer<br/>(Sensors, Field Triage, P2P Chat)"]
     AirDB["AirDbEngine<br/>(BLE Mesh, Vector Clocks, Security Mesh)"]
 
-    subgraph AeroLogAdapter ["AeroLog BYOD Persistence Seam"]
-        Adapter["AeroLogDbAdapter (AirDbAdapter)<br/>• getChangesSince: Scans mutation feed<br/>• applyChanges: Put/Delete with native HLC<br/>• getLatestHlc: Reads latest timestamp"]
+    subgraph AeroLogAdapter ["Persistence Seam"]
+        Adapter["AeroLogAirDbAdapter (JVM/Android) / Custom BYOD (Apple)<br/>• getChangesSince: Scans mutation feed<br/>• applyChanges: Put/Delete with native HLC<br/>• getLatestHlc: Reads latest timestamp"]
     end
 
     subgraph AeroLogCore ["AeroLog Engine (Pure Rust via UniFFI)"]
@@ -54,131 +54,101 @@ flowchart TD
 
 ---
 
-## Implementing `AirDbAdapter` with AeroLog
+## Platform Architecture & Ecosystem Integration
 
-Connecting AeroLog to AirDB requires implementing the four core methods of `AirDbAdapter`:
+AirDB provides two distinct deployment models for AeroLog persistence:
+
+1. **Android & JVM (`airdb-adapter-aerolog`)**: First-class turnkey adapter artifact (`AeroLogAirDbAdapter`) built on `AbstractAirDbAdapter`. Bundles precompiled AeroLog UniFFI dynamic libraries (`libaerolog_uniffi.so`, `libaerolog_uniffi.dylib`) across Linux, macOS, and Android architectures.
+2. **Apple Platforms (`AirDbKit` BYOD Seam)**: In accordance with **Invariant 6** (`AirDbKit` maintains zero third-party SPM dependencies and relies strictly on Apple system frameworks), `AirDbKit` ships natively with `SqliteDbAdapter`. Applications wishing to use AeroLog on iOS or macOS can link the UniFFI Rust binary at the application layer and implement the `AirDbAdapter` protocol via the BYOD pattern.
+
+---
+
+## Implementing `AirDbAdapter` with AeroLog
 
 ### Kotlin (Android / JVM)
 
+The official `airdb-adapter-aerolog` module provides `AeroLogAirDbAdapter`, implementing `AbstractAirDbAdapter` with automatic Last-Write-Wins (LWW) reconciliation, in-memory KeyDir indexing, changelog streams, and Bitcask compaction:
+
 ```kotlin
-package io.airdb.adapter.aerolog
-
-import io.airdb.adapter.AirDbAdapter
-import io.airdb.model.ChangeRecord
-import io.airdb.model.MutationType
-import io.aerolog.uniffi.FfiAeroLogDb
-import io.aerolog.uniffi.FfiMutationRecord
-
-class AeroLogDbAdapter(
-    private val db: FfiAeroLogDb
-) : AirDbAdapter {
-
-    override suspend fun getChangesSince(
-        sinceHlcTimestamp: String?,
-        limit: Int
-    ): List<ChangeRecord> {
-        // Parse sinceHlcTimestamp into physical and logical components
-        val parts = sinceHlcTimestamp?.split("-")
-        val physical = parts?.getOrNull(0)?.toULongOrNull()
-        val logical = parts?.getOrNull(1)?.toUShortOrNull()
-        val nodeHash = parts?.getOrNull(2)?.toULongOrNull()
-
-        val mutations = db.scanMutationsSince(
-            sincePhysicalTime = physical,
-            sinceLogicalCounter = logical,
-            sinceNodeHash = nodeHash,
-            limit = limit.toUInt()
-        )
-
-        return mutations.map { mut ->
-            ChangeRecord(
-                collection = mut.key.substringBefore(":"),
-                id = mut.key.substringAfter(":"),
-                mutationType = if (mut.recordType == 1.toUByte()) MutationType.DELETE else MutationType.PUT,
-                payload = mut.payload,
-                hlcTimestamp = mut.hlcString
-            )
-        }
-    }
-
-    override suspend fun applyChanges(changes: List<ChangeRecord>) {
-        for (change in changes) {
-            val parts = change.hlcTimestamp.split("-")
-            val pt = parts.getOrNull(0)?.toULongOrNull() ?: 0UL
-            val lc = parts.getOrNull(1)?.toUShortOrNull() ?: 0U
-            val nh = parts.getOrNull(2)?.toULongOrNull() ?: 0UL
-
-            if (change.mutationType == MutationType.DELETE) {
-                db.delete(change.collection, change.id)
-            } else {
-                db.putWithHlc(
-                    collection = change.collection,
-                    key = change.id,
-                    value = change.payload,
-                    physicalTime = pt,
-                    logicalCounter = lc,
-                    nodeIdHash = nh
-                )
-            }
-        }
-    }
-
-    override suspend fun getLatestHlc(): String? {
-        val recent = db.scanMutationsSince(null, null, null, 1U)
-        return recent.firstOrNull()?.hlcString
-    }
+// build.gradle.kts
+dependencies {
+    implementation("io.airdb:airdb-core:0.2.0")
+    implementation("io.airdb:airdb-adapter-aerolog:0.2.0")
 }
 ```
 
-### Swift (Apple Platforms)
+```kotlin
+package io.airdb.demo
+
+import io.airdb.adapter.aerolog.AeroLogAirDbAdapter
+import io.airdb.core.engine.AirDbEngine
+import io.airdb.transport.ble.AndroidBleTransport
+import java.io.File
+
+// Initialize AeroLog storage in app sandbox directory
+val storageDirectory = File(context.filesDir, "aerolog_data")
+val adapter = AeroLogAirDbAdapter.open(storageDirectory, nodeId = "node-alpha")
+
+// Connect persistence adapter to AirDbEngine
+val engine = AirDbEngine(
+    nodeName = "node-alpha",
+    adapter = adapter,
+    transport = AndroidBleTransport(context)
+)
+
+engine.start()
+```
+
+### Swift (Apple Platforms - BYOD Pattern)
+
+Applications targeting iOS or macOS that link the AeroLog UniFFI library can conform their wrapper to `AirDbAdapter` directly at the application layer:
 
 ```swift
-import AirDbKit
-import AeroLogUniFFI
 import Foundation
+import AirDbKit
 
 public final class AeroLogDbAdapter: AirDbAdapter, @unchecked Sendable {
-    private let db: FfiAeroLogDb
+    private let database: FfiAeroLogDb
 
     public init(database: FfiAeroLogDb) {
-        self.db = database
+        self.database = database
     }
 
     public func getChangesSince(
         sinceHlcTimestamp: String?,
         limit: Int
     ) async throws -> [ChangeRecord] {
-        var pt: UInt64? = nil
-        var lc: UInt16? = nil
-        var nh: UInt64? = nil
+        var physicalTime: UInt64? = nil
+        var logicalCounter: UInt16? = nil
+        var nodeHash: UInt64? = nil
 
         if let hlc = sinceHlcTimestamp {
             let parts = hlc.split(separator: "-")
             if parts.count >= 3 {
-                pt = UInt64(parts[0])
-                lc = UInt16(parts[1])
-                nh = UInt64(parts[2])
+                physicalTime = UInt64(parts[0])
+                logicalCounter = UInt16(parts[1])
+                nodeHash = UInt64(parts[2])
             }
         }
 
-        let mutations = try db.scanMutationsSince(
-            sincePhysicalTime: pt,
-            sinceLogicalCounter: lc,
-            sinceNodeHash: nh,
+        let mutations = try database.scanMutationsSince(
+            sincePhysicalTime: physicalTime,
+            sinceLogicalCounter: logicalCounter,
+            sinceNodeHash: nodeHash,
             limit: UInt32(limit)
         )
 
-        return mutations.map { mut in
-            let keyParts = mut.key.split(separator: ":", maxSplits: 1)
-            let col = keyParts.first.map(String.init) ?? "default"
-            let id = keyParts.count > 1 ? String(keyParts[1]) : mut.key
+        return mutations.map { mutation in
+            let keyParts = mutation.key.split(separator: ":", maxSplits: 1)
+            let collection = keyParts.first.map(String.init) ?? "default"
+            let id = keyParts.count > 1 ? String(keyParts[1]) : mutation.key
 
             return ChangeRecord(
-                collection: col,
                 id: id,
-                mutationType: mut.recordType == 1 ? .delete : .put,
-                payload: mut.payload,
-                hlcTimestamp: mut.hlcString
+                collection: collection,
+                type: mutation.recordType == 1 ? .delete : .put,
+                payload: mutation.payload,
+                hlcTimestamp: mutation.hlcString
             )
         }
     }
@@ -186,27 +156,27 @@ public final class AeroLogDbAdapter: AirDbAdapter, @unchecked Sendable {
     public func applyChanges(_ changes: [ChangeRecord]) async throws {
         for change in changes {
             let parts = change.hlcTimestamp.split(separator: "-")
-            let pt = parts.count > 0 ? (UInt64(parts[0]) ?? 0) : 0
-            let lc = parts.count > 1 ? (UInt16(parts[1]) ?? 0) : 0
-            let nh = parts.count > 2 ? (UInt64(parts[2]) ?? 0) : 0
+            let physicalTime = parts.count > 0 ? (UInt64(parts[0]) ?? 0) : 0
+            let logicalCounter = parts.count > 1 ? (UInt16(parts[1]) ?? 0) : 0
+            let nodeHash = parts.count > 2 ? (UInt64(parts[2]) ?? 0) : 0
 
             if change.mutationType == .delete {
-                _ = try db.delete(collection: change.collection, key: change.id)
+                _ = try database.delete(collection: change.collection, key: change.id)
             } else {
-                _ = try db.putWithHlc(
+                _ = try database.putWithHlc(
                     collection: change.collection,
                     key: change.id,
                     value: change.payload,
-                    physicalTime: pt,
-                    logicalCounter: lc,
-                    nodeIdHash: nh
+                    physicalTime: physicalTime,
+                    logicalCounter: logicalCounter,
+                    nodeIdHash: nodeHash
                 )
             }
         }
     }
 
     public func getLatestHlc() async throws -> String? {
-        let recent = try db.scanMutationsSince(
+        let recent = try database.scanMutationsSince(
             sincePhysicalTime: nil,
             sinceLogicalCounter: nil,
             sinceNodeHash: nil,
