@@ -63,7 +63,11 @@ public enum HlcComparator: Sendable {
         return String(hlcTimestamp[afterSecond...])
     }
 
-    /// Decomposes a canonical HLC timestamp string into physical time (ms), logical counter, and origin node.
+    /// Decomposes a canonical HLC timestamp string into its constituent components:
+    /// physical time (epoch milliseconds), logical counter, and originating node identifier.
+    ///
+    /// - Parameter str: Canonical HLC string in `<physicalTime>-<logicalCounter>-<nodeId>` format.
+    /// - Returns: A tuple of `(pt, lc, node)` if the string is well-formed, or `nil` if malformed.
     public static func parseHlcComponents(_ str: String) -> (pt: Int64, lc: Int, node: String)? {
         guard let firstDash = str.firstIndex(of: "-") else { return nil }
         let ptSub = str[..<firstDash]

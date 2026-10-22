@@ -384,29 +384,20 @@ class SqliteDbAdapter(
                 }
             }
 
-            val toDeleteChangelog = mutableListOf<String>()
-            val selectChangelogSql = "SELECT hlc_timestamp FROM airdb_changelog WHERE type = ?"
-            connection.prepareStatement(selectChangelogSql).use { selectStmt ->
-                selectStmt.setInt(1, MutationType.DELETE.ordinal)
-                selectStmt.executeQuery().use { rs ->
-                    while (rs.next()) {
-                        val hlc = rs.getString("hlc_timestamp")
-                        if (HlcComparator.compare(hlc, pruneHlcThreshold) < 0) {
-                            toDeleteChangelog.add(hlc)
-                        }
-                    }
-                }
-            }
+            val thresholdComponents = HlcComparator.parseHlcComponents(pruneHlcThreshold)
+            val thresholdPt = thresholdComponents?.first ?: 0L
+            val thresholdLc = thresholdComponents?.second ?: 0
 
-            if (toDeleteChangelog.isNotEmpty()) {
-                val deleteChangelogSql = "DELETE FROM airdb_changelog WHERE type = ? AND hlc_timestamp = ?"
-                connection.prepareStatement(deleteChangelogSql).use { deleteStmt ->
-                    for (hlc in toDeleteChangelog) {
-                        deleteStmt.setInt(1, MutationType.DELETE.ordinal)
-                        deleteStmt.setString(2, hlc)
-                        deleteStmt.executeUpdate()
-                    }
-                }
+            val deleteChangelogSql = """
+                DELETE FROM airdb_changelog 
+                WHERE type = ? AND (physical_time < ? OR (physical_time = ? AND logical_counter <= ?))
+            """.trimIndent()
+            connection.prepareStatement(deleteChangelogSql).use { deleteStmt ->
+                deleteStmt.setInt(1, MutationType.DELETE.ordinal)
+                deleteStmt.setLong(2, thresholdPt)
+                deleteStmt.setLong(3, thresholdPt)
+                deleteStmt.setInt(4, thresholdLc)
+                deleteStmt.executeUpdate()
             }
         }
         Unit

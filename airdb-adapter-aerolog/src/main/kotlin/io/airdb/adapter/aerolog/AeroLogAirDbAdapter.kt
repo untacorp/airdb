@@ -98,9 +98,11 @@ class AeroLogAirDbAdapter(
                 return@withContext emptyList()
             }
 
-            // Read the full stream chronologically so historical range queries
-            // and pagination starting from null or older HLCs do not skip entries.
-            val fetchCount = total.coerceAtMost(Int.MAX_VALUE.toULong()).toUInt()
+            // Read stream chronologically up to a safety ceiling to prevent JVM heap exhaustion.
+            // Note: Upstream AeroLog UniFFI currently provides tail-relative `readRecent(limit)`.
+            // When native sequential range queries are exposed in Rust FFI, this can be streamed.
+            val maxFetchCeiling = 10_000UL
+            val fetchCount = total.coerceAtMost(maxFetchCeiling).toUInt()
             val entries = changelogStream.readRecent(fetchCount)
             val result = ArrayList<ChangeRecord>(limit.coerceAtMost(entries.size))
 

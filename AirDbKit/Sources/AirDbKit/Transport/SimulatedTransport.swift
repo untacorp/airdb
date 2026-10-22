@@ -81,6 +81,13 @@ public final class SimulatedTransport: AirDbTransport, @unchecked Sendable {
     private var clusterKey: Data?
     private var isRunning: Bool = false
 
+    /// Initializes a simulated in-memory BLE transport node.
+    ///
+    /// - Parameters:
+    ///   - nodeId: Unique identifier for this local peer node.
+    ///   - network: Shared simulated network mesh coordinating peer delivery.
+    ///   - maxChunkSize: Maximum chunk size in bytes for packet fragmentation.
+    ///   - clusterKey: Optional 256-bit symmetric encryption key for ChaCha20-Poly1305 AEAD framing.
     public init(nodeId: String, network: SimulatedNetwork, maxChunkSize: Int = 460, clusterKey: Data? = nil) {
         self.nodeId = nodeId
         self.network = network
@@ -88,6 +95,9 @@ public final class SimulatedTransport: AirDbTransport, @unchecked Sendable {
         self.clusterKey = clusterKey
     }
 
+    /// Sets or updates the cluster encryption key for wire framing on this simulated transport.
+    ///
+    /// - Parameter key: 256-bit symmetric cluster key, or nil for unencrypted packets.
     public func setClusterKey(_ key: Data?) {
         lock.withScopedLock {
             self.clusterKey = key

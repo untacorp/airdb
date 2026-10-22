@@ -392,10 +392,14 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         // Explicitly finalize SELECT cursor before executing mutations to release table lock
         sqlite3_finalize(selectStmt)
 
-        // Physically delete tombstones past the threshold by primary key within an atomic transaction
-        if !toDelete.isEmpty {
-            try executeSimple("BEGIN IMMEDIATE TRANSACTION;")
-            do {
+        let components = HlcComparator.parseHlcComponents(pruneHlcThreshold)
+        let thresholdPt = components?.pt ?? 0
+        let thresholdLc = components?.lc ?? 0
+
+        // Physically delete tombstones past the threshold within an atomic transaction
+        try executeSimple("BEGIN IMMEDIATE TRANSACTION;")
+        do {
+            if !toDelete.isEmpty {
                 let deleteSql = "DELETE FROM airdb_entities WHERE collection = ? AND id = ?"
                 var deleteStmt: OpaquePointer?
                 defer { sqlite3_finalize(deleteStmt) }
@@ -417,32 +421,31 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                         throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
                     }
                 }
-                // Also purge matching soft-deleted records from airdb_changelog
-                let deleteChangelogSql = "DELETE FROM airdb_changelog WHERE type = ? AND collection = ? AND id = ?"
-                var deleteChangelogStmt: OpaquePointer?
-                defer { sqlite3_finalize(deleteChangelogStmt) }
+            }
 
-                if sqlite3_prepare_v2(db, deleteChangelogSql, -1, &deleteChangelogStmt, nil) != SQLITE_OK {
-                    throw SqliteError.prepareFailed(String(cString: sqlite3_errmsg(db)))
-                }
+            // Purge deleted records from airdb_changelog in a single atomic statement
+            let deleteChangelogSql = """
+            DELETE FROM airdb_changelog 
+            WHERE type = ? AND (physical_time < ? OR (physical_time = ? AND logical_counter <= ?));
+            """
+            var deleteChangelogStmt: OpaquePointer?
+            defer { sqlite3_finalize(deleteChangelogStmt) }
 
-                for item in toDelete {
-                    sqlite3_reset(deleteChangelogStmt)
-                    sqlite3_clear_bindings(deleteChangelogStmt)
-                    sqlite3_bind_int(deleteChangelogStmt, 1, Int32(MutationType.delete.rawValue))
-                    item.collection.withCString { colStr in
-                        item.id.withCString { idStr in
-                            sqlite3_bind_text(deleteChangelogStmt, 2, colStr, -1, sqliteTransient)
-                            sqlite3_bind_text(deleteChangelogStmt, 3, idStr, -1, sqliteTransient)
-                        }
-                    }
-                    if sqlite3_step(deleteChangelogStmt) != SQLITE_DONE {
-                        throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
-                    }
-                }
+            if sqlite3_prepare_v2(db, deleteChangelogSql, -1, &deleteChangelogStmt, nil) != SQLITE_OK {
+                throw SqliteError.prepareFailed(String(cString: sqlite3_errmsg(db)))
+            }
 
-                try executeSimple("COMMIT TRANSACTION;")
-            } catch {
+            sqlite3_bind_int(deleteChangelogStmt, 1, Int32(MutationType.delete.rawValue))
+            sqlite3_bind_int64(deleteChangelogStmt, 2, thresholdPt)
+            sqlite3_bind_int64(deleteChangelogStmt, 3, thresholdPt)
+            sqlite3_bind_int64(deleteChangelogStmt, 4, Int64(thresholdLc))
+
+            if sqlite3_step(deleteChangelogStmt) != SQLITE_DONE {
+                throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
+            }
+
+            try executeSimple("COMMIT TRANSACTION;")
+        } catch {
                 try? executeSimple("ROLLBACK TRANSACTION;")
                 throw error
             }
@@ -608,7 +611,11 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
             return cached
         }
         guard let db = db else { throw SqliteError.databaseClosed }
-        let sql = "SELECT hlc_timestamp FROM airdb_changelog"
+        let sql = """
+        SELECT hlc_timestamp FROM airdb_changelog 
+        ORDER BY physical_time DESC, logical_counter DESC, origin_node DESC 
+        LIMIT 1;
+        """
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
 
@@ -617,16 +624,8 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         }
 
         var maxHlc: String?
-        while sqlite3_step(stmt) == SQLITE_ROW {
-            if let hlc = sqlite3_column_text(stmt, 0).flatMap({ String(cString: $0) }) {
-                if let current = maxHlc {
-                    if HlcComparator.compare(hlc, current) == .orderedDescending {
-                        maxHlc = hlc
-                    }
-                } else {
-                    maxHlc = hlc
-                }
-            }
+        if sqlite3_step(stmt) == SQLITE_ROW {
+            maxHlc = sqlite3_column_text(stmt, 0).flatMap({ String(cString: $0) })
         }
         maxSeenHlc = maxHlc
         return maxHlc
