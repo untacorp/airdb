@@ -33,7 +33,6 @@ public protocol AirDbAdapter: Sendable {
 
 /// Thread-safe in-memory adapter reference implementation for testing and rapid prototyping.
 public actor MemoryDbAdapter: AirDbAdapter {
-    // collection -> (id -> ChangeRecord)
     private var tables: [String: [String: ChangeRecord]] = [:]
     private var changelog: [ChangeRecord] = []
 
@@ -57,13 +56,13 @@ public actor MemoryDbAdapter: AirDbAdapter {
     public func applyChanges(_ changes: [ChangeRecord]) async throws {
         for change in changes {
             var table = tables[change.collection] ?? [:]
-            let existing = table[change.id]
-
-            if existing == nil || HlcComparator.compare(change.hlcTimestamp, existing!.hlcTimestamp) == .orderedDescending {
-                table[change.id] = change
-                tables[change.collection] = table
-                changelog.append(change)
+            if let existing = table[change.id],
+               HlcComparator.compare(change.hlcTimestamp, existing.hlcTimestamp) != .orderedDescending {
+                continue
             }
+            table[change.id] = change
+            tables[change.collection] = table
+            changelog.append(change)
         }
     }
 

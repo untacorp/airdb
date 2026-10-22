@@ -41,8 +41,6 @@ public final class AssemblyBuffer: @unchecked Sendable {
         guard let (header, chunk) = FragmentHeader.decode(fragmentPacket.payload) else {
             return nil
         }
-
-        // Validate index and total bounds
         guard header.total > 0, header.index >= 0, header.index < header.total else { return nil }
 
         lock.lock()
@@ -52,7 +50,6 @@ public final class AssemblyBuffer: @unchecked Sendable {
 
         var assembly = assemblies[header.fragmentId] ?? {
             if assemblies.count >= maxConcurrentAssemblies {
-                // Evict oldest
                 if let oldestKey = assemblies.min(by: { $0.value.createdAt < $1.value.createdAt })?.key {
                     assemblies.removeValue(forKey: oldestKey)
                 }
@@ -64,25 +61,22 @@ public final class AssemblyBuffer: @unchecked Sendable {
             )
         }()
 
-        if assembly.fragments[header.index] == nil {
-            assembly.fragments[header.index] = chunk
-            assembly.receivedCount += 1
+        guard assembly.fragments[header.index] == nil else { return nil }
+        assembly.fragments[header.index] = chunk
+        assembly.receivedCount += 1
 
-            if assembly.receivedCount == assembly.total {
-                assemblies.removeValue(forKey: header.fragmentId)
-
-                var fullData = Data()
-                for part in assembly.fragments {
-                    guard let p = part else { return nil }
-                    fullData.append(p)
-                }
-                return BinaryCodec.decode(fullData, clusterKey: clusterKey)
-            } else {
-                assemblies[header.fragmentId] = assembly
-            }
+        guard assembly.receivedCount == assembly.total else {
+            assemblies[header.fragmentId] = assembly
+            return nil
         }
 
-        return nil
+        assemblies.removeValue(forKey: header.fragmentId)
+        var fullData = Data()
+        for part in assembly.fragments {
+            guard let p = part else { return nil }
+            fullData.append(p)
+        }
+        return BinaryCodec.decode(fullData, clusterKey: clusterKey)
     }
 
     /// Convenience alias matching labeled argument convention.

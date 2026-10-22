@@ -166,35 +166,35 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
         }
     }
 
-    // MARK: - TransportListener
+    private func createSession(peerId: String, linkId: String) -> SyncSession {
+        SyncSession(
+            peerId: peerId,
+            linkId: linkId,
+            localNodeId: localNodeId,
+            localNodeName: nodeName,
+            adapter: adapter,
+            clock: clock,
+            vectorClock: vectorClock,
+            transport: transport,
+            clusterKey: clusterKey,
+            authorKeyPair: authorKeyPair,
+            enforceSignatures: enforceSignatures
+        ) { [weak self] pId, changeCount in
+            guard let self = self else { return }
+            let listeners = self.lock.withScopedLock { self.syncListeners }
+            for listener in listeners {
+                listener(pId, changeCount)
+            }
+        }
+    }
 
     public func onTransportEvent(_ event: TransportEvent) {
         switch event {
         case .linkConnected(let peerId, let linkId):
-            let session = SyncSession(
-                peerId: peerId,
-                linkId: linkId,
-                localNodeId: localNodeId,
-                localNodeName: nodeName,
-                adapter: adapter,
-                clock: clock,
-                vectorClock: vectorClock,
-                transport: transport,
-                clusterKey: clusterKey,
-                authorKeyPair: authorKeyPair,
-                enforceSignatures: enforceSignatures
-            ) { [weak self] pId, changeCount in
-                guard let self = self else { return }
-                let listeners = self.lock.withScopedLock { self.syncListeners }
-                for listener in listeners {
-                    listener(pId, changeCount)
-                }
-            }
-
+            let session = createSession(peerId: peerId, linkId: linkId)
             let task = Task<Void, Never> { [weak session] in
                 await session?.start()
             }
-
             lock.withScopedLock {
                 sessions[peerId] = session
                 sessionTasks[peerId] = task
@@ -202,41 +202,18 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
 
         case .linkDisconnected(let peerId, _):
             let (session, task) = lock.withScopedLock {
-                let s = sessions.removeValue(forKey: peerId)
-                let t = sessionTasks.removeValue(forKey: peerId)
-                return (s, t)
+                (sessions.removeValue(forKey: peerId), sessionTasks.removeValue(forKey: peerId))
             }
             task?.cancel()
             session?.stop()
 
         case .packetReceived(let packet, let peerId, let linkId):
             let session = lock.withScopedLock { () -> SyncSession in
-                if let s = sessions[peerId] {
-                    return s
-                }
-                let s = SyncSession(
-                    peerId: peerId,
-                    linkId: linkId,
-                    localNodeId: localNodeId,
-                    localNodeName: nodeName,
-                    adapter: adapter,
-                    clock: clock,
-                    vectorClock: vectorClock,
-                    transport: transport,
-                    clusterKey: clusterKey,
-                    authorKeyPair: authorKeyPair,
-                    enforceSignatures: enforceSignatures
-                ) { [weak self] pId, changeCount in
-                    guard let self = self else { return }
-                    let listeners = self.lock.withScopedLock { self.syncListeners }
-                    for listener in listeners {
-                        listener(pId, changeCount)
-                    }
-                }
+                if let s = sessions[peerId] { return s }
+                let s = createSession(peerId: peerId, linkId: linkId)
                 sessions[peerId] = s
                 return s
             }
-
             session.enqueue(packet: packet)
 
         default:
