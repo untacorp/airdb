@@ -233,4 +233,40 @@ class AeroLogAirDbAdapterTest {
             assertEquals("Autonomous Mesh Sync via AeroLog", String(persisted!!.payload))
         }
     }
+
+    @Test
+    fun testHistoricalChangelogRangeScanDoesNotSkipRecords(@TempDir tempDir: Path) = runBlocking {
+        val dbDir = File(tempDir.toFile(), "aerolog_pagination")
+        AeroLogAirDbAdapter.open(dbDir).use { adapter ->
+            // Insert 150 records, exceeding the old hardcoded 100-entry tail fetch limit
+            val records = (0 until 150).map { i ->
+                ChangeRecord(
+                    id = "item-$i",
+                    collection = "test_stream",
+                    type = MutationType.INSERT,
+                    payload = "Payload $i".toByteArray(),
+                    hlcTimestamp = "${1000 + i}-0-nodeA"
+                )
+            }
+            adapter.applyChanges(records)
+
+            // 1. Initial page (since null, limit 20) must return the OLDEST 20 records (item-0 through item-19)
+            val page1 = adapter.readChangelogSince(null, limit = 20)
+            assertEquals(20, page1.size)
+            assertEquals("item-0", page1.first().id)
+            assertEquals("item-19", page1.last().id)
+
+            // 2. Second page must continue monotonically without skipping records
+            val page2 = adapter.readChangelogSince(page1.last().hlcTimestamp, limit = 20)
+            assertEquals(20, page2.size)
+            assertEquals("item-20", page2.first().id)
+            assertEquals("item-39", page2.last().id)
+
+            // 3. Range scan from an intermediate HLC
+            val midScan = adapter.readChangelogSince("1099-0-nodeA", limit = 10)
+            assertEquals(10, midScan.size)
+            assertEquals("item-100", midScan.first().id)
+            assertEquals("item-109", midScan.last().id)
+        }
+    }
 }
