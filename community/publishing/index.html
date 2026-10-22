@@ -2164,14 +2164,14 @@
 <h2 id="1-publishing-specification-architecture">1. Publishing Specification Architecture</h2>
 <p>AirDB releases adhere to strict decentralization, cryptographic integrity, and zero-trust standards. Every release encompasses four standardized pillars:</p>
 <pre class="mermaid"><code>flowchart TD
-    A["Release Trigger (Git Tag vX.Y.Z)"] --&gt; B["Pre-Flight Checklist &amp; Audit"]
-    B --&gt; C["Automated CI/CD Pipeline"]
-    C --&gt; D["Maven Central (Android/JVM)"]
-    C --&gt; E["Swift Package Manager (Apple)"]
-    C --&gt; F["GitHub Releases &amp; Checksums"]
-    D --&gt; G["Verified Artifacts on repo1.maven.org"]
-    E --&gt; H["Indexed on Swift Package Index"]
-    F --&gt; I["Offline Bundles &amp; SHA-256 Hashes"]</code></pre>
+    A["Release Trigger&lt;br/&gt;(Git Tag vX.Y.Z)"] --&gt; B["Pre-Flight Checklist&lt;br/&gt;&amp; Security Audit"]
+    B --&gt; C["Automated CI/CD&lt;br/&gt;Release Pipeline"]
+    C --&gt; D["Maven Central&lt;br/&gt;(Android / JVM)"]
+    C --&gt; E["Swift Package Manager&lt;br/&gt;(Apple Platforms)"]
+    C --&gt; F["GitHub Releases&lt;br/&gt;&amp; Checksums"]
+    D --&gt; G["Verified Artifacts&lt;br/&gt;repo1.maven.org"]
+    E --&gt; H["Indexed Package&lt;br/&gt;Swift Package Index"]
+    F --&gt; I["Offline Bundles&lt;br/&gt;SHA-256 Hashes"]</code></pre>
 <h3 id="pillar-1-semantic-versioning-and-changelog-standards">Pillar 1: Semantic Versioning and Changelog Standards</h3>
 <p>AirDB follows <a href="https://semver.org/">Semantic Versioning 2.0.0</a> (<code>MAJOR.MINOR.PATCH</code>):
 - <code>MAJOR</code>: Breaking architectural changes or wire protocol incompatibilities.

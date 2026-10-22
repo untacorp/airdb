@@ -1965,11 +1965,11 @@
 <hr />
 <h2 id="architecture-at-a-glance">Architecture at a Glance</h2>
 <pre class="mermaid"><code>flowchart TD
-    App["Application Layer&lt;br/&gt;(Domain Entities, Disaster Triage, POS, Sensor Logs)"]
+    App["Application Layer&lt;br/&gt;(Domain Entities, Triage, POS, Logs)"]
 
     subgraph PersistenceTier ["Persistence Layer (Pluggable Seam)"]
-        SQLite["airdb-adapter-sqlite / SqliteDbAdapter&lt;br/&gt;WAL Mode • Append-Only Changelog • Tombstones"]
-        BYOD["Bring Your Own Database (BYOD)&lt;br/&gt;Room • SQLDelight • GRDB • SwiftData • In-Memory"]
+        SQLite["airdb-adapter-sqlite&lt;br/&gt;(SqliteDbAdapter)&lt;br/&gt;WAL Mode • Changelog Index&lt;br/&gt;Tombstone Soft-Deletes"]
+        BYOD["Bring Your Own Database&lt;br/&gt;(BYOD Adapters)&lt;br/&gt;Room • SQLDelight • GRDB&lt;br/&gt;SwiftData • In-Memory KV"]
     end
 
     subgraph EngineTier ["Reconciliation &amp; Causality Core"]
@@ -1977,16 +1977,16 @@
     end
 
     subgraph SecurityTier ["Zero-Trust Cryptographic Mesh"]
-        Crypto["airdb-crypto / AirDbKit Crypto&lt;br/&gt;ChaCha20-Poly1305 AEAD • Ed25519 Signatures • HKDF-SHA256"]
+        Crypto["airdb-crypto / AirDbKit Crypto&lt;br/&gt;ChaCha20-Poly1305 AEAD • Ed25519 Signatures&lt;br/&gt;RFC 5869 HKDF-SHA256 Key Schedule"]
     end
 
     subgraph ProtocolTier ["Wire Codec &amp; MTU Framing"]
-        Protocol["airdb-protocol / AirDbKit Protocol&lt;br/&gt;Compact Binary Header • zlib Deflate • 13-Byte MTU Envelope"]
+        Protocol["airdb-protocol / AirDbKit Protocol&lt;br/&gt;Compact Binary Header • zlib Deflate&lt;br/&gt;13-Byte MTU Envelope &amp; AssemblyBuffer"]
     end
 
     subgraph TransportTier ["Transport Abstraction (AirDbTransport)"]
-        BLE["airdb-transport-ble / CoreBluetoothTransport&lt;br/&gt;Dual-Role Central + Peripheral • Single-Flight GATT Queue"]
-        Sim["airdb-transport-sim / SimulatedTransport&lt;br/&gt;Sans-I/O In-Memory Multi-Node Mesh Simulation"]
+        BLE["airdb-transport-ble&lt;br/&gt;CoreBluetoothTransport&lt;br/&gt;Central + Peripheral Roles&lt;br/&gt;Single-Flight GATT Queue"]
+        Sim["airdb-transport-sim&lt;br/&gt;SimulatedTransport&lt;br/&gt;Sans-I/O In-Memory&lt;br/&gt;Multi-Node Mesh Lab"]
     end
 
     App --&gt; PersistenceTier

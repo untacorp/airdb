@@ -2151,24 +2151,24 @@
 <h2 id="4-the-4-phase-synchronization-handshake">4. The 4-Phase Synchronization Handshake</h2>
 <p>When two devices connect over Bluetooth Low Energy, they execute a 4-step conversation:</p>
 <pre class="mermaid"><code>sequenceDiagram
-    participant A as Device A (Scanner / Central)
-    participant B as Device B (Advertiser / Peripheral)
+    participant A as Device A (Central)
+    participant B as Device B (Peripheral)
 
     Note over A,B: Phase 1 &amp; 2: Identity &amp; Cluster Authentication
-    A-&gt;&gt;B: Phase 1: HANDSHAKE (NodeID, Protocol Version)
-    B--&gt;&gt;A: Phase 2: HANDSHAKE_ACK (Cluster Verified, Session OK)
+    A-&gt;&gt;B: Phase 1: HANDSHAKE (NodeID, Protocol Ver)
+    B--&gt;&gt;A: Phase 2: HANDSHAKE_ACK (Session Verified)
 
     Note over A,B: Phase 3: Reconciliation &amp; Delta Streaming
     A-&gt;&gt;B: Phase 3a: RECONCILE_REQ (Vector Clock A)
     B--&gt;&gt;A: Phase 3b: RECONCILE_RESP (Vector Clock B)
-    B-&gt;&gt;A: Phase 3c: DELTA_BATCH (Missing changes B -&gt; A)
-    A-&gt;&gt;B: Phase 3d: DELTA_BATCH (Missing changes A -&gt; B)
+    B-&gt;&gt;A: Phase 3c: DELTA_BATCH (Changes B -&gt; A)
+    A-&gt;&gt;B: Phase 3d: DELTA_BATCH (Changes A -&gt; B)
 
     Note over A,B: Phase 4: Acknowledgment &amp; Convergence
-    A--&gt;&gt;B: Phase 4: DELTA_ACK (Confirm batch applied)
-    B--&gt;&gt;A: Phase 4: DELTA_ACK (Confirm batch applied)
+    A--&gt;&gt;B: Phase 4: DELTA_ACK (Batch Applied)
+    B--&gt;&gt;A: Phase 4: DELTA_ACK (Batch Applied)
 
-    Note over A,B: State: SYNCHRONIZED (Live Mutations Stream in Real-Time)</code></pre>
+    Note over A,B: State: SYNCHRONIZED&lt;br/&gt;Live Mutations Stream in Real-Time</code></pre>
 <h3 id="mesh-convergence-latency">Mesh Convergence Latency</h3>
 <p>Because AirDB exchanges compact vector clocks rather than dumping full table snapshots, state reconciliation scales predictably with network diameter:</p>
 <pre class="mermaid"><code>xychart-beta

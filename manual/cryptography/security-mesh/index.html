@@ -1894,9 +1894,9 @@
 <p>In a distributed mesh network, data doesn't just travel point-to-point. Packets often bounce across intermediate volunteer phones before reaching their final destination.</p>
 <p>In emergency response camps or outdoor markets, those intermediate devices might be untrusted, running modified software, or accidentally misconfigured. AirDB uses a <strong>Zero-Trust Cryptographic Mesh</strong> to ensure that data remains private and impossible to tamper with.</p>
 <pre class="mermaid"><code>flowchart TD
-    L1["Layer 1: Cluster-Level AEAD Encryption (ChaCha20-Poly1305)&lt;br/&gt;Scrambles over-the-air packets; binds headers so outsiders cannot inject data."]
-    L2["Layer 2: Record-Level Digital Signatures (Ed25519)&lt;br/&gt;Proves who wrote each change; prevents intermediate relay phones from tampering."]
-    L3["Layer 3: Key Derivation &amp; Session Materials (HKDF-SHA256)&lt;br/&gt;Deterministically derives cluster and session keys from a single passphrase."]
+    L1["&lt;b&gt;Layer 1: Cluster-Level AEAD Encryption&lt;/b&gt;&lt;br/&gt;RFC 8439 ChaCha20-Poly1305&lt;br/&gt;Scrambles radio packets; binds headers via AAD&lt;br/&gt;Outsiders cannot inject or decrypt traffic"]
+    L2["&lt;b&gt;Layer 2: Record-Level Digital Signatures&lt;/b&gt;&lt;br/&gt;RFC 8032 Ed25519 Signatures&lt;br/&gt;Proves who wrote each mutation&lt;br/&gt;Intermediate relay nodes cannot tamper with data"]
+    L3["&lt;b&gt;Layer 3: Key Derivation &amp; Session Materials&lt;/b&gt;&lt;br/&gt;RFC 5869 HKDF-SHA256&lt;br/&gt;Derives operational cluster and session keys&lt;br/&gt;Deterministically generated from passphrase"]
 
     L1 --&gt; L2
     L2 --&gt; L3</code></pre>
@@ -1927,15 +1927,15 @@ If an attacker tampers with the sender ID or flips a single bit in the header, t
 </ol>
 <p>If an intermediate phone altered the payload, modified the timestamp, or faked an edit, the cryptographic math fails and Phone C rejects the mutation immediately. The fake record is never written to disk or shared further.</p>
 <pre class="mermaid"><code>sequenceDiagram
-    participant A as Phone A (Author / Dr. Budi)
-    participant B as Phone B (Untrusted Intermediate Relay)
+    participant A as Phone A (Author)
+    participant B as Phone B (Untrusted Relay)
     participant C as Phone C (Headquarters)
 
-    Note over A: 1. Author signs mutation:&lt;br/&gt;Sign(Payload + HLC, Ed25519 Private Key)
-    A-&gt;&gt;B: 2. Transmit Encrypted Radio Packet (Cluster Key)
-    Note over B: 3. Intermediate phone decrypts packet.&lt;br/&gt;Tampering with payload invalidates author signature!
+    Note over A: 1. Author signs mutation:&lt;br/&gt;Sign(Payload + HLC,&lt;br/&gt;Ed25519 Private Key)
+    A-&gt;&gt;B: 2. Transmit Encrypted Packet&lt;br/&gt;(Cluster Key)
+    Note over B: 3. Intermediate phone inspects packet.&lt;br/&gt;Tampering with payload invalidates&lt;br/&gt;author signature!
     B-&gt;&gt;C: 4. Relay packet over next BLE hop
-    Note over C: 5. Verify Ed25519 Signature against Dr. Budi's Public Key.&lt;br/&gt;Tampered packet is immediately rejected and dropped.</code></pre>
+    Note over C: 5. Verify Ed25519 Signature against&lt;br/&gt;Author Public Key.&lt;br/&gt;Tampered record rejected &amp; dropped!</code></pre>
 <hr />
 <h2 id="layer-3-key-derivation-hkdf-sha256">Layer 3: Key Derivation (HKDF-SHA256)</h2>
 <p>Rather than managing complex raw 32-byte hexadecimal keys, teams can share a human-readable cluster passphrase. AirDB uses <strong>RFC 5869 HKDF-SHA256</strong> to derive cryptographically secure keys:</p>

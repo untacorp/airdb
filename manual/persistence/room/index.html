@@ -1896,9 +1896,9 @@
 <h2 id="architecture-overview">Architecture Overview</h2>
 <pre class="mermaid"><code>flowchart TD
     UI["Android Application UI&lt;br/&gt;(Jetpack Compose / ViewModel)"]
-    Room["AppDatabase (Room)&lt;br/&gt;• Domain Tables: survivor_entity, pos_orders&lt;br/&gt;• Changelog Table: airdb_changelog (append-only sync feed)"]
-    Adapter["RoomAirDbAdapter (Implements AirDbAdapter)&lt;br/&gt;• getChangesSince(hlc, limit) -&gt; Reads airdb_changelog&lt;br/&gt;• applyChanges(changes) -&gt; Applies LWW merge to Room tables&lt;br/&gt;• getLatestHlc() -&gt; SELECT MAX(hlc_timestamp)"]
-    Engine["AirDbEngine&lt;br/&gt;(Causal Ordering, BLE Transport, Cryptography)"]
+    Room["AppDatabase (Room)&lt;br/&gt;• Domain Tables: survivor_entity, pos_orders&lt;br/&gt;• Changelog: airdb_changelog (append feed)"]
+    Adapter["RoomAirDbAdapter (AirDbAdapter)&lt;br/&gt;• getChangesSince: Reads changelog table&lt;br/&gt;• applyChanges: Merges LWW updates&lt;br/&gt;• getLatestHlc: Queries max timestamp"]
+    Engine["AirDbEngine&lt;br/&gt;(Causality, BLE Transports, Cryptography)"]
 
     UI --&gt;|Queries / Updates| Room
     Room --&gt; Adapter
