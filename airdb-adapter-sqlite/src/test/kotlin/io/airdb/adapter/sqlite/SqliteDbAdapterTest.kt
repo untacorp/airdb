@@ -168,4 +168,30 @@ class SqliteDbAdapterTest {
             assertTrue(missing.any { it.id == "e-3" })
         }
     }
+
+    @Test
+    fun testReadChangelogSinceNumericOrderingAndLimit() = runBlocking {
+        SqliteDbAdapter.inMemory().use { adapter ->
+            // In ASCII sorting, "1000-10-nodeA" is smaller than "1000-2-nodeA"
+            // But in canonical HLC numeric ordering, 10 > 2.
+            adapter.applyChanges(
+                listOf(
+                    ChangeRecord("rec-2", "tests", MutationType.INSERT, byteArrayOf(1), "1000-2-nodeA"),
+                    ChangeRecord("rec-10", "tests", MutationType.INSERT, byteArrayOf(2), "1000-10-nodeA"),
+                    ChangeRecord("rec-20", "tests", MutationType.INSERT, byteArrayOf(3), "1000-20-nodeA")
+                )
+            )
+
+            // Reading since "1000-2-nodeA" must return rec-10 and rec-20 via SQL range scan
+            val changesSince2 = adapter.readChangelogSince("1000-2-nodeA", limit = 10)
+            assertEquals(2, changesSince2.size)
+            assertEquals("rec-10", changesSince2[0].id)
+            assertEquals("rec-20", changesSince2[1].id)
+
+            // Test strict limit
+            val limited = adapter.readChangelogSince("1000-2-nodeA", limit = 1)
+            assertEquals(1, limited.size)
+            assertEquals("rec-10", limited[0].id)
+        }
+    }
 }

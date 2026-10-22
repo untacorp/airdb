@@ -63,7 +63,8 @@ public enum HlcComparator: Sendable {
         return String(hlcTimestamp[afterSecond...])
     }
 
-    private static func parseHlcComponents(_ str: String) -> (pt: Int64, lc: Int, node: String)? {
+    /// Decomposes a canonical HLC timestamp string into physical time (ms), logical counter, and origin node.
+    public static func parseHlcComponents(_ str: String) -> (pt: Int64, lc: Int, node: String)? {
         guard let firstDash = str.firstIndex(of: "-") else { return nil }
         let ptSub = str[..<firstDash]
         guard let pt = Int64(ptSub) else { return nil }
