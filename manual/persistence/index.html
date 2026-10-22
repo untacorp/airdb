@@ -1797,6 +1797,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#storage-engine-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Engine Performance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#available-storage-guides" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1887,6 +1898,14 @@
 - Store a tombstone entry with <code>MutationType.DELETE</code> and the deletion's HLC timestamp.
 - If an outdated node attempts to sync an older version of that entity later, the tombstone prevents the deleted record from reappearing.</p>
 <hr />
+<h2 id="storage-engine-performance">Storage Engine Performance</h2>
+<p>Write throughput across persistence adapters when ingesting 128-byte delta batches on modern mobile hardware:</p>
+<pre class="mermaid"><code>xychart-beta
+    title "Local Persistence Write Throughput (Ops/Sec)"
+    x-axis ["SQLite (WAL)", "Jetpack Room", "Apple SqliteDbAdapter", "In-Memory KV"]
+    y-axis "Write Throughput (ops/sec)" 0 --&gt; 35000
+    bar [14200, 11800, 16500, 31200]</code></pre>
+<hr />
 <h2 id="available-storage-guides">Available Storage Guides</h2>
 <p>Follow our dedicated guides for your platform's preferred storage engine:</p>
 <ul>
@@ -1960,6 +1979,8 @@
     
     
       <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
       

@@ -1919,16 +1919,42 @@
 <p>Whether you are coordinating emergency disaster relief in camps without cellular towers, running pop-up POS cash registers at an outdoor festival, or syncing wildlife conservation logs in national parks, AirDB ensures your data stays synchronized without needing an internet connection.</p>
 <hr />
 <h2 id="quick-navigation">Quick Navigation</h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>+---------------------------------------------------------------------------------+
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>|                                                                                 |
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>|   [ About ]              [ Getting Started ]     [ Manual ]      [ Reference ]  |
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>|   Introduction           5-Minute Quickstart     Storage (BYOD)  Wire Formats   |
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>|   Before You Start       Apple AirDbKit Guide    How Sync Works  API Contracts  |
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>|   Feature Inventory      Disaster Triage App     Crypto Mesh                    |
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>|   FAQ &amp; Troubleshooting  Platform Permissions    BLE Networking                 |
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>|                                                                                 |
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>+---------------------------------------------------------------------------------+
-</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Section</th>
+<th style="text-align: left;">Core Topics</th>
+<th style="text-align: left;">Recommended Audience</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong><a href="about/">About AirDB</a></strong></td>
+<td style="text-align: left;">Introduction, Architectural Philosophy, Feature Inventory, FAQ</td>
+<td style="text-align: left;">Engineers evaluating off-grid P2P synchronization</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><a href="getting-started/">Getting Started</a></strong></td>
+<td style="text-align: left;">5-Minute Quickstart, Apple <code>AirDbKit</code> Guide, Disaster Triage App</td>
+<td style="text-align: left;">Developers integrating AirDB into Android or iOS apps</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><a href="manual/">Engine Manual</a></strong></td>
+<td style="text-align: left;">Storage Adapters (Room, SQLite, GRDB), HLC Causality, Crypto Mesh, BLE</td>
+<td style="text-align: left;">Architects exploring replication internals &amp; wire codecs</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><a href="community/contributing/">Community &amp; Governance</a></strong></td>
+<td style="text-align: left;">Coding Standards, Architecture Decision Records (ADRs), Publishing</td>
+<td style="text-align: left;">Contributors building features or auditing protocols</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><a href="reference/wire-spec/">Reference</a></strong></td>
+<td style="text-align: left;">Binary Packet Specifications, Wire Codecs, API Contracts</td>
+<td style="text-align: left;">Low-level developers and protocol auditors</td>
+</tr>
+</tbody>
+</table>
 <ul>
 <li><strong><a href="about/">About AirDB</a></strong>: What AirDB is, how it compares to centralized databases and chat mesh apps, and key concepts to know before you start.</li>
 <li><strong><a href="getting-started/">Getting Started</a></strong>: Add AirDB to your Android or Apple project, follow the 5-minute quickstart, or build a complete disaster triage application.</li>
@@ -1938,52 +1964,38 @@
 </ul>
 <hr />
 <h2 id="architecture-at-a-glance">Architecture at a Glance</h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>+-------------------------------------------------------------------+
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>| Application Layer (Local Domain Entities, Triage, Sales, Orders)  |
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>+---------------------------------+---------------------------------+
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                                  |
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>+---------------------------------v---------------------------------+
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>| airdb-adapter-sqlite / SqliteDbAdapter (Durable Persistence Seam) |
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>| - Write-Ahead Logging (WAL) &amp; ACID Transactions                   |
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>| - Monotonic HLC Indexing (airdb_changelog)                        |
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>| - Soft-Delete Tombstone Lifecycle Management                      |
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>+---------------------------------+---------------------------------+
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>                                  | Implements AirDbAdapter
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>+---------------------------------v---------------------------------+
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>| airdb-core / AirDbKit Core (Causality &amp; Reconciliation Engine)     |
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>| - Hybrid Logical Clock (HLC) &amp; Vector Clock State Tracker         |
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>| - 4-Phase SyncSession Protocol (Handshake, Reconcile, Delta, Ack) |
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>| - Ed25519 Record Author Verification (Zero-Trust Enforcement)     |
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>+---------------------------------+---------------------------------+
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>                                  | Signs / Verifies Records
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>+---------------------------------v---------------------------------+
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>| airdb-crypto / AirDbKit Crypto (Zero-Trust Cryptographic Mesh)    |
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>| - RFC 8439 ChaCha20-Poly1305 AEAD Symmetric Cipher                |
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>| - RFC 8032 Ed25519 Digital Signature &amp; Key Verification           |
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>| - RFC 5869 HKDF-SHA256 Key Derivation Function                    |
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>+---------------------------------+---------------------------------+
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>                                  | Encodes / Decodes
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>+---------------------------------v---------------------------------+
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>| airdb-protocol / AirDbKit Protocol (Wire Codec &amp; MTU Framing)     |
-</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>| - 23/31-byte Header with Authenticated Additional Data (AAD)      |
-</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>| - zlib Deflate Compression (&gt;256 B Payloads)                      |
-</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>| - 13-byte Fragment Envelope with AssemblyBuffer (30s TTL)         |
-</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>+---------------------------------+---------------------------------+
-</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>                                  | Streams Bytes
-</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>+---------------------------------v---------------------------------+
-</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>| Universal Transport Boundary (AirDbTransport)                     |
-</span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>|            ^                                     ^                |
-</span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>|            |                                     |                |
-</span><span id="__span-1-37"><a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>| +----------+--------------------+   +------------+--------------+ |
-</span><span id="__span-1-38"><a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>| | airdb-transport-ble           |   | airdb-transport-sim       | |
-</span><span id="__span-1-39"><a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a>| | CoreBluetoothTransport        |   | SimulatedTransport        | |
-</span><span id="__span-1-40"><a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a>| | (Android &amp; Apple BLE Drivers) |   | (Sans-I/O In-Memory       | |
-</span><span id="__span-1-41"><a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>| | - Central + Peripheral Roles  |   |  Multi-Node Mesh Lab)     | |
-</span><span id="__span-1-42"><a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a>| | - Single-Flight GATT Queue    |   +---------------------------+ |
-</span><span id="__span-1-43"><a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a>| | - Backpressure Flow Control   |                                 |
-</span><span id="__span-1-44"><a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a>| +-------------------------------+                                 |
-</span><span id="__span-1-45"><a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a>+-------------------------------------------------------------------+
-</span></code></pre></div>
+<pre class="mermaid"><code>flowchart TD
+    App["Application Layer&lt;br/&gt;(Domain Entities, Disaster Triage, POS, Sensor Logs)"]
+
+    subgraph PersistenceTier ["Persistence Layer (Pluggable Seam)"]
+        SQLite["airdb-adapter-sqlite / SqliteDbAdapter&lt;br/&gt;WAL Mode • Append-Only Changelog • Tombstones"]
+        BYOD["Bring Your Own Database (BYOD)&lt;br/&gt;Room • SQLDelight • GRDB • SwiftData • In-Memory"]
+    end
+
+    subgraph EngineTier ["Reconciliation &amp; Causality Core"]
+        Core["airdb-core / AirDbKit Core&lt;br/&gt;Hybrid Logical Clocks (HLC) • Vector Clocks&lt;br/&gt;4-Phase SyncSession Protocol"]
+    end
+
+    subgraph SecurityTier ["Zero-Trust Cryptographic Mesh"]
+        Crypto["airdb-crypto / AirDbKit Crypto&lt;br/&gt;ChaCha20-Poly1305 AEAD • Ed25519 Signatures • HKDF-SHA256"]
+    end
+
+    subgraph ProtocolTier ["Wire Codec &amp; MTU Framing"]
+        Protocol["airdb-protocol / AirDbKit Protocol&lt;br/&gt;Compact Binary Header • zlib Deflate • 13-Byte MTU Envelope"]
+    end
+
+    subgraph TransportTier ["Transport Abstraction (AirDbTransport)"]
+        BLE["airdb-transport-ble / CoreBluetoothTransport&lt;br/&gt;Dual-Role Central + Peripheral • Single-Flight GATT Queue"]
+        Sim["airdb-transport-sim / SimulatedTransport&lt;br/&gt;Sans-I/O In-Memory Multi-Node Mesh Simulation"]
+    end
+
+    App --&gt; PersistenceTier
+    PersistenceTier --&gt; Core
+    Core --&gt; Crypto
+    Crypto --&gt; Protocol
+    Protocol --&gt; TransportTier
+    TransportTier --&gt; BLE
+    TransportTier --&gt; Sim</code></pre>
 <hr />
 <h2 id="acknowledgements-prior-art">Acknowledgements &amp; Prior Art</h2>
 <p>AirDB's protocols and architecture were informed by foundational research across distributed systems, local-first software, and wireless networking:</p>
@@ -2059,6 +2071,8 @@
     
     
       <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="javascripts/mathjax.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js"></script>
       

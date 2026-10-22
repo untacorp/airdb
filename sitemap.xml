@@ -2,146 +2,146 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://untacorp.github.io/airdb/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/about/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/about/before-you-start/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/about/faq/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/about/features/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/community/changelog/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/community/coding-standards/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/community/contributing/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/community/publishing/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/community/security/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/community/adr/0001-sans-io-architecture/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/community/adr/0002-hlc-conflict-resolution/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/community/adr/0003-single-flight-gatt-queue/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/community/adr/0004-sqlite-persistence-seam/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/community/adr/0005-zero-trust-cryptographic-mesh/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/getting-started/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/getting-started/apple-airdbkit/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/getting-started/first-app-tutorial/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/getting-started/installation/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/getting-started/quickstart/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/causality/how-sync-works/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/cryptography/security-mesh/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/networking/wire-and-ble/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/persistence/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/persistence/apple-coredata/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/persistence/apple-grdb/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/persistence/apple-sqlite/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/persistence/apple-swiftdata/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/persistence/in-memory/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/persistence/room/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/persistence/sqldelight/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/persistence/sqlite/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/manual/simulation/testing-with-simulator/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/reference/api-contracts/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
     <url>
          <loc>https://untacorp.github.io/airdb/reference/wire-spec/</loc>
-         <lastmod>2026-10-21</lastmod>
+         <lastmod>2026-10-22</lastmod>
     </url>
 </urlset>
