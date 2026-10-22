@@ -44,6 +44,17 @@ public enum SqliteError: Error, LocalizedError {
 /// Last-Write-Wins (LWW) conflict resolution, and tombstone compaction without any third-party dependencies.
 public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
     private var db: OpaquePointer?
+    private var maxSeenHlc: String?
+
+    private func updateMaxSeenHlc(_ hlc: String) {
+        if let current = maxSeenHlc {
+            if HlcComparator.compare(hlc, current) == .orderedDescending {
+                maxSeenHlc = hlc
+            }
+        } else {
+            maxSeenHlc = hlc
+        }
+    }
 
     /// Creates an isolated in-memory SQLite database instance (ideal for unit testing).
     public static func inMemory() throws -> SqliteDbAdapter {
@@ -236,6 +247,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         if sqlite3_step(stmt) != SQLITE_DONE {
             throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
         }
+        updateMaxSeenHlc(entity.hlcTimestamp)
     }
 
     public func readChangelogSince(sinceHlcTimestamp: String?, limit: Int = 100) throws -> [ChangeRecord] {
@@ -350,6 +362,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         if sqlite3_step(stmt) != SQLITE_DONE {
             throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
         }
+        updateMaxSeenHlc(record.hlcTimestamp)
     }
 
     public func compact(pruneHlcThreshold: String) async throws {
@@ -580,6 +593,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                 if sqlite3_step(changelogStmt) != SQLITE_DONE {
                     throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
                 }
+                updateMaxSeenHlc(change.hlcTimestamp)
             }
 
             try executeSimple("COMMIT TRANSACTION;")
@@ -590,8 +604,11 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
     }
 
     public func getLatestHlc() throws -> String? {
+        if let cached = maxSeenHlc {
+            return cached
+        }
         guard let db = db else { throw SqliteError.databaseClosed }
-        let sql = "SELECT hlc_timestamp FROM airdb_changelog ORDER BY seq DESC LIMIT 1"
+        let sql = "SELECT hlc_timestamp FROM airdb_changelog"
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
 
@@ -599,10 +616,20 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
             throw SqliteError.prepareFailed(String(cString: sqlite3_errmsg(db)))
         }
 
-        if sqlite3_step(stmt) == SQLITE_ROW {
-            return sqlite3_column_text(stmt, 0).flatMap { String(cString: $0) }
+        var maxHlc: String?
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let hlc = sqlite3_column_text(stmt, 0).flatMap({ String(cString: $0) }) {
+                if let current = maxHlc {
+                    if HlcComparator.compare(hlc, current) == .orderedDescending {
+                        maxHlc = hlc
+                    }
+                } else {
+                    maxHlc = hlc
+                }
+            }
         }
-        return nil
+        maxSeenHlc = maxHlc
+        return maxHlc
     }
 
     // MARK: - Query & Convenience API

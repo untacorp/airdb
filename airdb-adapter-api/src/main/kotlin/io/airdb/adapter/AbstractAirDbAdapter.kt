@@ -126,6 +126,9 @@ abstract class AbstractAirDbAdapter : AirDbAdapter {
         return missing
     }
 
+    @Volatile
+    private var maxSeenHlc: String? = null
+
     override suspend fun applyChanges(changes: List<ChangeRecord>) {
         executeInTransaction {
             for (change in changes) {
@@ -142,15 +145,39 @@ abstract class AbstractAirDbAdapter : AirDbAdapter {
                     )
                     writeEntity(entity)
                     appendChangelog(change)
+                    updateMaxSeenHlc(change.hlcTimestamp)
                 }
             }
         }
     }
 
+    protected fun updateMaxSeenHlc(hlc: String) {
+        val current = maxSeenHlc
+        if (current == null || HlcComparator.compare(hlc, current) > 0) {
+            maxSeenHlc = hlc
+        }
+    }
+
     override suspend fun getLatestHlc(): String? {
-        val latest = readChangelogSince(null, limit = 1000)
-            .maxWithOrNull(Comparator.comparing({ it.hlcTimestamp }, HlcComparator))
-        return latest?.hlcTimestamp
+        val cached = maxSeenHlc
+        if (cached != null) return cached
+
+        var cursor: String? = null
+        var maxHlc: String? = null
+        val pageSize = 1000
+        while (true) {
+            val batch = readChangelogSince(cursor, limit = pageSize)
+            if (batch.isEmpty()) break
+            for (record in batch) {
+                if (maxHlc == null || HlcComparator.compare(record.hlcTimestamp, maxHlc) > 0) {
+                    maxHlc = record.hlcTimestamp
+                }
+            }
+            if (batch.size < pageSize) break
+            cursor = batch.last().hlcTimestamp
+        }
+        maxSeenHlc = maxHlc
+        return maxHlc
     }
 
     /**
