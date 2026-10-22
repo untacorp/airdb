@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 import java.io.Closeable
 import java.io.File
 import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Production-ready high-performance AirDB adapter backed by AeroLog native Rust engine.
@@ -71,11 +72,20 @@ class AeroLogAirDbAdapter(
     private val db: FfiAeroLogDb
     private val changelogStream: FfiStream
     private val mutex = Mutex()
+    private val knownCollections = ConcurrentHashMap.newKeySet<String>()
 
     init {
         val nodeHash = hashNodeId(nodeId)
         db = FfiAeroLogDb.open(dbPath, nodeHash)
         changelogStream = db.getStream(CHANGELOG_STREAM)
+        val total = changelogStream.totalEntries()
+        if (total > 0UL) {
+            val recent = changelogStream.readRecent(1U)
+            if (recent.isNotEmpty()) {
+                val last = deserializeChangeRecord(recent.last().payload)
+                updateMaxSeenHlc(last.hlcTimestamp)
+            }
+        }
     }
 
     override suspend fun readEntity(collection: String, id: String): StoredEntity? = withContext(Dispatchers.IO) {
@@ -87,8 +97,10 @@ class AeroLogAirDbAdapter(
 
     override suspend fun writeEntity(entity: StoredEntity) = withContext(Dispatchers.IO) {
         mutex.withLock {
+            knownCollections.add(entity.collection)
             val bytes = serializeStoredEntity(entity)
             db.put(entity.collection, entity.id, bytes)
+            updateMaxSeenHlc(entity.hlcTimestamp)
         }
         Unit
     }
@@ -124,8 +136,10 @@ class AeroLogAirDbAdapter(
 
     override suspend fun appendChangelog(record: ChangeRecord) = withContext(Dispatchers.IO) {
         mutex.withLock {
+            knownCollections.add(record.collection)
             val bytes = serializeChangeRecord(record)
             changelogStream.append(bytes)
+            updateMaxSeenHlc(record.hlcTimestamp)
         }
         Unit
     }
@@ -133,6 +147,7 @@ class AeroLogAirDbAdapter(
     override suspend fun applyChanges(changes: List<ChangeRecord>): Unit = withContext(Dispatchers.IO) {
         mutex.withLock {
             for (change in changes) {
+                knownCollections.add(change.collection)
                 val existingBytes = db.get(change.collection, change.id)
                 if (existingBytes != null) {
                     val existing = deserializeStoredEntity(change.collection, change.id, existingBytes)
@@ -148,6 +163,7 @@ class AeroLogAirDbAdapter(
                 )
                 db.put(entity.collection, entity.id, serializeStoredEntity(entity))
                 changelogStream.append(serializeChangeRecord(change))
+                updateMaxSeenHlc(change.hlcTimestamp)
             }
         }
     }
@@ -182,10 +198,31 @@ class AeroLogAirDbAdapter(
     }
 
     /**
-     * Triggers background Bitcask compaction to reclaim dead records and consolidate segments.
+     * Triggers Bitcask compaction to reclaim dead records and consolidate segments.
+     * Prunes soft-deleted tombstones whose HLC timestamp is older than or equal to [pruneHlcThreshold].
      */
     override suspend fun compact(pruneHlcThreshold: String) = withContext(Dispatchers.IO) {
         mutex.withLock {
+            val total = changelogStream.totalEntries()
+            if (total > 0UL) {
+                val fetchCount = total.coerceAtMost(10_000UL).toUInt()
+                val entries = changelogStream.readRecent(fetchCount)
+                for (entry in entries) {
+                    val change = deserializeChangeRecord(entry.payload)
+                    knownCollections.add(change.collection)
+                }
+            }
+
+            for (collection in knownCollections) {
+                val pairs = db.scanCollection(collection)
+                for (pair in pairs) {
+                    val entity = deserializeStoredEntity(collection, pair.key, pair.value)
+                    if (entity.type == MutationType.DELETE && HlcComparator.compare(entity.hlcTimestamp, pruneHlcThreshold) <= 0) {
+                        db.delete(collection, pair.key)
+                    }
+                }
+            }
+
             db.compact()
         }
         Unit

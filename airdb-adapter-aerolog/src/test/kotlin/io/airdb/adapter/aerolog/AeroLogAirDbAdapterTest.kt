@@ -132,6 +132,8 @@ class AeroLogAirDbAdapterTest {
 
             adapter.compact("2000-1-nodeA")
             assertNull(adapter.getActiveRecord("inventory", "item-del"))
+            assertFalse(adapter.isRecordDeleted("inventory", "item-del"))
+            assertNull(adapter.readEntity("inventory", "item-del"))
         }
     }
 
