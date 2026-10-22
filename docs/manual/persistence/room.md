@@ -6,27 +6,16 @@ This guide demonstrates how to integrate AirDB into an existing Android applicat
 
 ## Architecture Overview
 
-```
-+-------------------------------------------------------------+
-| Android Application UI (Jetpack Compose / ViewModel)        |
-+------------------------------+------------------------------+
-                               | Queries / Updates
-+------------------------------v------------------------------+
-| AppDatabase (Room)                                          |
-| - Domain Tables: survivor_entity, pos_orders                |
-| - Changelog Table: airdb_changelog (append-only sync feed)  |
-+------------------------------+------------------------------+
-                               |
-+------------------------------v------------------------------+
-| RoomAirDbAdapter (Implements AirDbAdapter)                  |
-| - getChangesSince(hlc, limit) -> Reads airdb_changelog      |
-| - applyChanges(changes) -> Applies LWW merge to Room tables |
-| - getLatestHlc() -> SELECT MAX(hlc_timestamp)               |
-+------------------------------+------------------------------+
-                               |
-+------------------------------v------------------------------+
-| AirDbEngine (Causal Ordering, BLE Transport, Cryptography)  |
-+-------------------------------------------------------------+
+```mermaid
+flowchart TD
+    UI["Android Application UI<br/>(Jetpack Compose / ViewModel)"]
+    Room["AppDatabase (Room)<br/>• Domain Tables: survivor_entity, pos_orders<br/>• Changelog Table: airdb_changelog (append-only sync feed)"]
+    Adapter["RoomAirDbAdapter (Implements AirDbAdapter)<br/>• getChangesSince(hlc, limit) -> Reads airdb_changelog<br/>• applyChanges(changes) -> Applies LWW merge to Room tables<br/>• getLatestHlc() -> SELECT MAX(hlc_timestamp)"]
+    Engine["AirDbEngine<br/>(Causal Ordering, BLE Transport, Cryptography)"]
+
+    UI -->|Queries / Updates| Room
+    Room --> Adapter
+    Adapter --> Engine
 ```
 
 ---

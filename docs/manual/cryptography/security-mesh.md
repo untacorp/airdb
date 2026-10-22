@@ -4,17 +4,14 @@ In a distributed mesh network, data doesn't just travel point-to-point. Packets 
 
 In emergency response camps or outdoor markets, those intermediate devices might be untrusted, running modified software, or accidentally misconfigured. AirDB uses a **Zero-Trust Cryptographic Mesh** to ensure that data remains private and impossible to tamper with.
 
-```
-+---------------------------------------------------------------------------------+
-| Layer 1: Cluster-Level AEAD Encryption (ChaCha20-Poly1305)                      |
-| Scrambles over-the-air packets; binds headers so outsiders cannot inject data.  |
-+---------------------------------------------------------------------------------+
-| Layer 2: Record-Level Digital Signatures (Ed25519)                               |
-| Proves who wrote each change; prevents intermediate relay phones from tampering.|
-+---------------------------------------------------------------------------------+
-| Layer 3: Key Derivation & Session Materials (HKDF-SHA256)                       |
-| Deterministically derives cluster and session keys from a single passphrase.    |
-+---------------------------------------------------------------------------------+
+```mermaid
+flowchart TD
+    L1["Layer 1: Cluster-Level AEAD Encryption (ChaCha20-Poly1305)<br/>Scrambles over-the-air packets; binds headers so outsiders cannot inject data."]
+    L2["Layer 2: Record-Level Digital Signatures (Ed25519)<br/>Proves who wrote each change; prevents intermediate relay phones from tampering."]
+    L3["Layer 3: Key Derivation & Session Materials (HKDF-SHA256)<br/>Deterministically derives cluster and session keys from a single passphrase."]
+
+    L1 --> L2
+    L2 --> L3
 ```
 
 ---
@@ -50,6 +47,19 @@ Device B decrypts the radio packet to inspect where it should be routed. If Devi
 3. **Relay Verification**: When Headquarters Phone C receives the record, it checks the digital signature against Doctor Budi's public key.
 
 If an intermediate phone altered the payload, modified the timestamp, or faked an edit, the cryptographic math fails and Phone C rejects the mutation immediately. The fake record is never written to disk or shared further.
+
+```mermaid
+sequenceDiagram
+    participant A as Phone A (Author / Dr. Budi)
+    participant B as Phone B (Untrusted Intermediate Relay)
+    participant C as Phone C (Headquarters)
+
+    Note over A: 1. Author signs mutation:<br/>Sign(Payload + HLC, Ed25519 Private Key)
+    A->>B: 2. Transmit Encrypted Radio Packet (Cluster Key)
+    Note over B: 3. Intermediate phone decrypts packet.<br/>Tampering with payload invalidates author signature!
+    B->>C: 4. Relay packet over next BLE hop
+    Note over C: 5. Verify Ed25519 Signature against Dr. Budi's Public Key.<br/>Tampered packet is immediately rejected and dropped.
+```
 
 ---
 

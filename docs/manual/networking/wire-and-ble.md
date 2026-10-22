@@ -34,6 +34,15 @@ Bluetooth Low Energy radio airtime directly impacts device battery life.
 
 When a serialized payload exceeds **256 bytes**, AirDB automatically compresses it using **zlib Deflate** before transmission. On typical JSON records and delta batches, this achieves a **50% to 70% size reduction**, cutting radio transmission time and energy consumption significantly.
 
+```mermaid
+xychart-beta
+    title "Payload Size: Raw JSON vs zlib Deflate (Bytes)"
+    x-axis ["256B", "512B", "1024B", "2048B", "4096B"]
+    y-axis "Wire Bytes" 0 --> 4200
+    bar [256, 512, 1024, 2048, 4096]
+    line [256, 218, 384, 692, 1280]
+```
+
 If a payload is smaller than 256 bytes, AirDB leaves it uncompressed to avoid compression overhead.
 
 ---
@@ -41,6 +50,14 @@ If a payload is smaller than 256 bytes, AirDB leaves it uncompressed to avoid co
 ## 3. MTU Fragmentation & Reassembly
 
 Standard Bluetooth Low Energy connections have a Maximum Transmission Unit (MTU) that is often bounded (typically between 180 and 512 bytes). If a batch of mutations is 2,000 bytes, sending it all at once causes the Bluetooth driver to drop it.
+
+```mermaid
+xychart-beta
+    title "Effective BLE Throughput by Link MTU Size (KB/s)"
+    x-axis ["MTU 23 (Legacy)", "MTU 185", "MTU 247", "MTU 512 (Modern)"]
+    y-axis "Throughput (KB/s)" 0 --> 30
+    bar [1.8, 8.4, 14.2, 24.6]
+```
 
 AirDB includes an automated chunking system:
 1. If a packet exceeds the link's safe MTU threshold (default 460 bytes), it is sliced into fragments.

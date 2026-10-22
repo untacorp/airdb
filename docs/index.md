@@ -16,17 +16,13 @@ Whether you are coordinating emergency disaster relief in camps without cellular
 
 ## Quick Navigation
 
-```
-+---------------------------------------------------------------------------------+
-|                                                                                 |
-|   [ About ]              [ Getting Started ]     [ Manual ]      [ Reference ]  |
-|   Introduction           5-Minute Quickstart     Storage (BYOD)  Wire Formats   |
-|   Before You Start       Apple AirDbKit Guide    How Sync Works  API Contracts  |
-|   Feature Inventory      Disaster Triage App     Crypto Mesh                    |
-|   FAQ & Troubleshooting  Platform Permissions    BLE Networking                 |
-|                                                                                 |
-+---------------------------------------------------------------------------------+
-```
+| Section | Core Topics | Recommended Audience |
+| :--- | :--- | :--- |
+| **[About AirDB](about/index.md)** | Introduction, Architectural Philosophy, Feature Inventory, FAQ | Engineers evaluating off-grid P2P synchronization |
+| **[Getting Started](getting-started/index.md)** | 5-Minute Quickstart, Apple `AirDbKit` Guide, Disaster Triage App | Developers integrating AirDB into Android or iOS apps |
+| **[Engine Manual](manual/index.md)** | Storage Adapters (Room, SQLite, GRDB), HLC Causality, Crypto Mesh, BLE | Architects exploring replication internals & wire codecs |
+| **[Community & Governance](community/contributing.md)** | Coding Standards, Architecture Decision Records (ADRs), Publishing | Contributors building features or auditing protocols |
+| **[Reference](reference/wire-spec.md)** | Binary Packet Specifications, Wire Codecs, API Contracts | Low-level developers and protocol auditors |
 
 - **[About AirDB](about/index.md)**: What AirDB is, how it compares to centralized databases and chat mesh apps, and key concepts to know before you start.
 - **[Getting Started](getting-started/index.md)**: Add AirDB to your Android or Apple project, follow the 5-minute quickstart, or build a complete disaster triage application.
@@ -38,52 +34,39 @@ Whether you are coordinating emergency disaster relief in camps without cellular
 
 ## Architecture at a Glance
 
-```
-+-------------------------------------------------------------------+
-| Application Layer (Local Domain Entities, Triage, Sales, Orders)  |
-+---------------------------------+---------------------------------+
-                                  |
-+---------------------------------v---------------------------------+
-| airdb-adapter-sqlite / SqliteDbAdapter (Durable Persistence Seam) |
-| - Write-Ahead Logging (WAL) & ACID Transactions                   |
-| - Monotonic HLC Indexing (airdb_changelog)                        |
-| - Soft-Delete Tombstone Lifecycle Management                      |
-+---------------------------------+---------------------------------+
-                                  | Implements AirDbAdapter
-+---------------------------------v---------------------------------+
-| airdb-core / AirDbKit Core (Causality & Reconciliation Engine)     |
-| - Hybrid Logical Clock (HLC) & Vector Clock State Tracker         |
-| - 4-Phase SyncSession Protocol (Handshake, Reconcile, Delta, Ack) |
-| - Ed25519 Record Author Verification (Zero-Trust Enforcement)     |
-+---------------------------------+---------------------------------+
-                                  | Signs / Verifies Records
-+---------------------------------v---------------------------------+
-| airdb-crypto / AirDbKit Crypto (Zero-Trust Cryptographic Mesh)    |
-| - RFC 8439 ChaCha20-Poly1305 AEAD Symmetric Cipher                |
-| - RFC 8032 Ed25519 Digital Signature & Key Verification           |
-| - RFC 5869 HKDF-SHA256 Key Derivation Function                    |
-+---------------------------------+---------------------------------+
-                                  | Encodes / Decodes
-+---------------------------------v---------------------------------+
-| airdb-protocol / AirDbKit Protocol (Wire Codec & MTU Framing)     |
-| - 23/31-byte Header with Authenticated Additional Data (AAD)      |
-| - zlib Deflate Compression (>256 B Payloads)                      |
-| - 13-byte Fragment Envelope with AssemblyBuffer (30s TTL)         |
-+---------------------------------+---------------------------------+
-                                  | Streams Bytes
-+---------------------------------v---------------------------------+
-| Universal Transport Boundary (AirDbTransport)                     |
-|            ^                                     ^                |
-|            |                                     |                |
-| +----------+--------------------+   +------------+--------------+ |
-| | airdb-transport-ble           |   | airdb-transport-sim       | |
-| | CoreBluetoothTransport        |   | SimulatedTransport        | |
-| | (Android & Apple BLE Drivers) |   | (Sans-I/O In-Memory       | |
-| | - Central + Peripheral Roles  |   |  Multi-Node Mesh Lab)     | |
-| | - Single-Flight GATT Queue    |   +---------------------------+ |
-| | - Backpressure Flow Control   |                                 |
-| +-------------------------------+                                 |
-+-------------------------------------------------------------------+
+```mermaid
+flowchart TD
+    App["Application Layer<br/>(Domain Entities, Disaster Triage, POS, Sensor Logs)"]
+
+    subgraph PersistenceTier ["Persistence Layer (Pluggable Seam)"]
+        SQLite["airdb-adapter-sqlite / SqliteDbAdapter<br/>WAL Mode • Append-Only Changelog • Tombstones"]
+        BYOD["Bring Your Own Database (BYOD)<br/>Room • SQLDelight • GRDB • SwiftData • In-Memory"]
+    end
+
+    subgraph EngineTier ["Reconciliation & Causality Core"]
+        Core["airdb-core / AirDbKit Core<br/>Hybrid Logical Clocks (HLC) • Vector Clocks<br/>4-Phase SyncSession Protocol"]
+    end
+
+    subgraph SecurityTier ["Zero-Trust Cryptographic Mesh"]
+        Crypto["airdb-crypto / AirDbKit Crypto<br/>ChaCha20-Poly1305 AEAD • Ed25519 Signatures • HKDF-SHA256"]
+    end
+
+    subgraph ProtocolTier ["Wire Codec & MTU Framing"]
+        Protocol["airdb-protocol / AirDbKit Protocol<br/>Compact Binary Header • zlib Deflate • 13-Byte MTU Envelope"]
+    end
+
+    subgraph TransportTier ["Transport Abstraction (AirDbTransport)"]
+        BLE["airdb-transport-ble / CoreBluetoothTransport<br/>Dual-Role Central + Peripheral • Single-Flight GATT Queue"]
+        Sim["airdb-transport-sim / SimulatedTransport<br/>Sans-I/O In-Memory Multi-Node Mesh Simulation"]
+    end
+
+    App --> PersistenceTier
+    PersistenceTier --> Core
+    Core --> Crypto
+    Crypto --> Protocol
+    Protocol --> TransportTier
+    TransportTier --> BLE
+    TransportTier --> Sim
 ```
 
 ---

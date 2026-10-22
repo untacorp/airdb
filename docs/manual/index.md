@@ -8,41 +8,18 @@ Welcome to the AirDB technical manual. This section provides an in-depth look at
 
 AirDB is structured into five distinct, decoupled layers:
 
-```
-+-------------------------------------------------------------------+
-| 1. Application Layer (Domain Entities, Triage, Sales, Inventory)  |
-+---------------------------------+---------------------------------+
-                                  |
-+---------------------------------v---------------------------------+
-| 2. Persistence Seam (AirDbAdapter)                                |
-|    - Durable SQLite with WAL mode (Android & Apple)               |
-|    - Pluggable Adapters: Room, SQLDelight, GRDB, SwiftData        |
-+---------------------------------+---------------------------------+
-                                  |
-+---------------------------------v---------------------------------+
-| 3. Causality & Synchronization (AirDbEngine & SyncSession)        |
-|    - Hybrid Logical Clocks (HLC) for deterministic total ordering |
-|    - Vector Clocks for tracking peer state & computing delta sets |
-|    - 4-Phase Sync Protocol (Handshake, Clock, Delta, Ack)         |
-|    - Last-Write-Wins (LWW) conflict resolution & tombstones       |
-+---------------------------------+---------------------------------+
-                                  |
-+---------------------------------v---------------------------------+
-| 4. Zero-Trust Cryptographic Mesh                                  |
-|    - RFC 8439 ChaCha20-Poly1305 AEAD (Cluster link encryption)    |
-|    - Header Authenticated Additional Data (AAD) tamper rejection  |
-|    - RFC 8032 Ed25519 digital signatures (Record author proof)    |
-|    - RFC 5869 HKDF-SHA256 key derivation schedule                 |
-+---------------------------------+---------------------------------+
-                                  |
-+---------------------------------v---------------------------------+
-| 5. Wire Codecs & Radio Transports                                 |
-|    - Binary packet framing (AirDbPacket) & zlib compression (>256B)|
-|    - MTU fragmentation with 30s sliding AssemblyBuffer            |
-|    - Dual-role BLE concurrency (Central + Peripheral)             |
-|    - Android single-flight GattOperationQueue & Apple Swift Actor |
-|    - Sans-I/O in-memory simulator for instant testing             |
-+-------------------------------------------------------------------+
+```mermaid
+flowchart TD
+    L1["1. Application Layer<br/>(Domain Entities, Triage, Sales, Inventory)"]
+    L2["2. Persistence Seam (AirDbAdapter)<br/>• Durable SQLite with WAL mode (Android & Apple)<br/>• Pluggable Adapters: Room, SQLDelight, GRDB, SwiftData"]
+    L3["3. Causality & Synchronization (AirDbEngine & SyncSession)<br/>• Hybrid Logical Clocks (HLC) for deterministic total ordering<br/>• Vector Clocks for tracking peer state & computing delta sets<br/>• 4-Phase Sync Protocol (Handshake, Clock, Delta, Ack)<br/>• Last-Write-Wins (LWW) conflict resolution & tombstones"]
+    L4["4. Zero-Trust Cryptographic Mesh<br/>• RFC 8439 ChaCha20-Poly1305 AEAD (Cluster link encryption)<br/>• Header Authenticated Additional Data (AAD) tamper rejection<br/>• RFC 8032 Ed25519 digital signatures (Record author proof)<br/>• RFC 5869 HKDF-SHA256 key derivation schedule"]
+    L5["5. Wire Codecs & Radio Transports<br/>• Binary packet framing (AirDbPacket) & zlib compression (>256B)<br/>• MTU fragmentation with 30s sliding AssemblyBuffer<br/>• Dual-role BLE concurrency (Central + Peripheral)<br/>• Android single-flight GattOperationQueue & Apple Swift Actor<br/>• Sans-I/O in-memory simulator for instant testing"]
+
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+    L4 --> L5
 ```
 
 ---
