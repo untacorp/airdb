@@ -404,6 +404,8 @@ extension CoreBluetoothTransport: CBPeripheralManagerDelegate {
     }
 
     public func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveWrite requests: [CBATTRequest]) {
+        guard let firstRequest = requests.first else { return }
+
         for request in requests {
             guard request.characteristic.uuid == config.characteristicUuid, let data = request.value else {
                 continue
@@ -412,6 +414,8 @@ extension CoreBluetoothTransport: CBPeripheralManagerDelegate {
             let linkId = "peripheral-\(peerId)"
             handleInboundData(data, peerId: peerId, linkId: linkId)
         }
+
+        peripheral.respond(to: firstRequest, withResult: .success)
     }
 
     public func peripheralManagerIsReady(toUpdateSubscribers peripheral: CBPeripheralManager) {
