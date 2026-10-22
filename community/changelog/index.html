@@ -1648,6 +1648,56 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#021-2026-10-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.2.1] - 2026-10-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.2.1] - 2026-10-22">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refactored
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#020-2026-10-21" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1660,7 +1710,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1688,7 +1738,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1869,6 +1919,56 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#021-2026-10-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.2.1] - 2026-10-22
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.2.1] - 2026-10-22">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refactored
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#020-2026-10-21" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1881,7 +1981,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1909,7 +2009,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1949,8 +2049,50 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <hr />
-<h2 id="020-2026-10-21">[0.2.0] - 2026-10-21</h2>
+<h2 id="021-2026-10-22">[0.2.1] - 2026-10-22</h2>
 <h3 id="added">Added</h3>
+<ul>
+<li><strong>AeroLog Native Storage Engine (<code>airdb-adapter-aerolog</code>)</strong>:</li>
+<li>High-throughput Append-Only Bitcask persistence adapter wrapping pure-Rust AeroLog via Mozilla UniFFI.</li>
+<li>Over 200,000 sequential writes/sec with hardware-accelerated CRC32-IEEE checksums and zero random flash I/O.</li>
+<li>Single-seek in-memory <code>KeyDir</code> indexing with sub-15-microsecond point read latency.</li>
+<li>Native Hybrid Logical Clock (HLC) physical-logical tuple alignment.</li>
+<li>Automatic segment compaction and tombstone garbage collection past prune HLC thresholds.</li>
+<li><strong>Apple Platform BYOD Integration Seam</strong>:</li>
+<li>Comprehensive documentation and reference implementation for Bring-Your-Own-Database (BYOD) AeroLog integration on iOS and macOS.</li>
+<li>Enforced Invariant 6 preserving zero third-party SPM dependencies in <code>AirDbKit</code>.</li>
+<li><strong>Visual Performance &amp; Architecture Metrics</strong>:</li>
+<li>Modernized MkDocs architecture diagrams using Mermaid and <code>xychart-beta</code> visual throughput charts.</li>
+</ul>
+<h3 id="fixed">Fixed</h3>
+<ul>
+<li><strong>Consolidated Audit Resolutions (Issues #9 to #20 via PR #33)</strong>:</li>
+<li><strong>Reconciliation Starvation (#9)</strong>: Added continuous delta batch streaming to prevent peer starvation under heavy write workloads.</li>
+<li><strong>BLE Transport Wire Framing (#10)</strong>: Corrected packet encryption layering and AEAD header binding across Android and Apple transports.</li>
+<li><strong>SQLite Changelog Scan OOM (#11)</strong>: Implemented chunked pagination cursor (<code>readChangelogSince</code>) to prevent heap exhaustion.</li>
+<li><strong>HLC Canonical Ordering (#12)</strong>: Standardized HLC comparator parsing and total order across Kotlin and Swift.</li>
+<li><strong>GATT Operation Queue Watchdog (#13, #14)</strong>: Added retry budget limits and watchdog timers to prevent Android BLE queue hangs.</li>
+<li><strong>AeroLog Changelog Ceiling (#15)</strong>: Added 10,000-entry safety fetch ceiling on stream scans to protect memory bounds.</li>
+<li><strong>CoreBluetooth ATT Write Drain (#16)</strong>: Added backpressure drain tracking <code>peripheralIsReady(toSendWriteWithoutResponse:)</code>.</li>
+<li><strong>Zip-Bomb Protection (#17)</strong>: Enforced strict 64KB max decompressed payload budget in <code>BinaryCodec</code>.</li>
+<li><strong>SQLite Tombstone Indexing (#18)</strong>: Added composite <code>(physical_time, logical_counter, origin_node)</code> indexes and atomic changelog compaction.</li>
+<li><strong>Swift Concurrency Hardening (#19)</strong>: Replaced unstructured detached tasks with structured actor tasks and clean lifecycle cancellation.</li>
+<li><strong>Kotlin Concurrency Alignment (#20)</strong>: Aligned coroutine dispatchers and lifecycle management with Kotlin Multiplatform standards.</li>
+<li><strong>AeroLog Cache &amp; Tombstone Compaction</strong>:</li>
+<li>Restored O(1) <code>maxSeenHlc</code> tracking in <code>AeroLogAirDbAdapter</code> on <code>appendChangelog</code> and <code>applyChanges</code>.</li>
+<li>Implemented KeyDir tombstone purging before executing Bitcask segment compaction.</li>
+</ul>
+<h3 id="refactored">Refactored</h3>
+<ul>
+<li><strong>Linux Kernel Filter Discipline (PR #34)</strong>:</li>
+<li>Stripped narrative comments and cognitive bloat across Kotlin and Swift codebases.</li>
+<li>Flattened nested conditionals using guard clauses and bouncer pattern (Linus' 3-indent law).</li>
+<li>Normalized variable naming, replacing cryptic abbreviations (<code>pt</code>, <code>lc</code>, <code>nh</code>, <code>mut</code>) and corporate filler with precise domain nouns (<code>physicalTime</code>, <code>logicalCounter</code>, <code>originNode</code>, <code>nodeHash</code>).</li>
+<li>Achieved net-negative lines while maintaining 100% test pass rates across both Linux and macOS CI.</li>
+</ul>
+<hr />
+<h2 id="020-2026-10-21">[0.2.0] - 2026-10-21</h2>
+<h3 id="added_1">Added</h3>
 <ul>
 <li><strong>Zero-Trust Cryptographic Mesh (<code>airdb-crypto</code> &amp; <code>AirDbKit/Crypto</code>)</strong>:</li>
 <li>RFC 8439 ChaCha20-Poly1305 AEAD symmetric cipher using Java 17 JCA on Android/JVM and Apple <code>CryptoKit</code> on Apple platforms.</li>
@@ -1976,7 +2118,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <hr />
 <h2 id="010-2026-10-20">[0.1.0] - 2026-10-20</h2>
-<h3 id="added_1">Added</h3>
+<h3 id="added_2">Added</h3>
 <ul>
 <li><strong>Core Engine (<code>airdb-core</code>)</strong>:</li>
 <li>Monotonic Hybrid Logical Clock (<code>HybridLogicalClock</code>, <code>HlcTimestamp</code>) with deterministic tie-breaking.</li>
