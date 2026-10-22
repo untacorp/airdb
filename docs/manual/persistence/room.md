@@ -9,9 +9,9 @@ This guide demonstrates how to integrate AirDB into an existing Android applicat
 ```mermaid
 flowchart TD
     UI["Android Application UI<br/>(Jetpack Compose / ViewModel)"]
-    Room["AppDatabase (Room)<br/>• Domain Tables: survivor_entity, pos_orders<br/>• Changelog Table: airdb_changelog (append-only sync feed)"]
-    Adapter["RoomAirDbAdapter (Implements AirDbAdapter)<br/>• getChangesSince(hlc, limit) -> Reads airdb_changelog<br/>• applyChanges(changes) -> Applies LWW merge to Room tables<br/>• getLatestHlc() -> SELECT MAX(hlc_timestamp)"]
-    Engine["AirDbEngine<br/>(Causal Ordering, BLE Transport, Cryptography)"]
+    Room["AppDatabase (Room)<br/>• Domain Tables: survivor_entity, pos_orders<br/>• Changelog: airdb_changelog (append feed)"]
+    Adapter["RoomAirDbAdapter (AirDbAdapter)<br/>• getChangesSince: Reads changelog table<br/>• applyChanges: Merges LWW updates<br/>• getLatestHlc: Queries max timestamp"]
+    Engine["AirDbEngine<br/>(Causality, BLE Transports, Cryptography)"]
 
     UI -->|Queries / Updates| Room
     Room --> Adapter

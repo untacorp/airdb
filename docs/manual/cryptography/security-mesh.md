@@ -6,9 +6,9 @@ In emergency response camps or outdoor markets, those intermediate devices might
 
 ```mermaid
 flowchart TD
-    L1["Layer 1: Cluster-Level AEAD Encryption (ChaCha20-Poly1305)<br/>Scrambles over-the-air packets; binds headers so outsiders cannot inject data."]
-    L2["Layer 2: Record-Level Digital Signatures (Ed25519)<br/>Proves who wrote each change; prevents intermediate relay phones from tampering."]
-    L3["Layer 3: Key Derivation & Session Materials (HKDF-SHA256)<br/>Deterministically derives cluster and session keys from a single passphrase."]
+    L1["<b>Layer 1: Cluster-Level AEAD Encryption</b><br/>RFC 8439 ChaCha20-Poly1305<br/>Scrambles radio packets; binds headers via AAD<br/>Outsiders cannot inject or decrypt traffic"]
+    L2["<b>Layer 2: Record-Level Digital Signatures</b><br/>RFC 8032 Ed25519 Signatures<br/>Proves who wrote each mutation<br/>Intermediate relay nodes cannot tamper with data"]
+    L3["<b>Layer 3: Key Derivation & Session Materials</b><br/>RFC 5869 HKDF-SHA256<br/>Derives operational cluster and session keys<br/>Deterministically generated from passphrase"]
 
     L1 --> L2
     L2 --> L3
@@ -50,15 +50,15 @@ If an intermediate phone altered the payload, modified the timestamp, or faked a
 
 ```mermaid
 sequenceDiagram
-    participant A as Phone A (Author / Dr. Budi)
-    participant B as Phone B (Untrusted Intermediate Relay)
+    participant A as Phone A (Author)
+    participant B as Phone B (Untrusted Relay)
     participant C as Phone C (Headquarters)
 
-    Note over A: 1. Author signs mutation:<br/>Sign(Payload + HLC, Ed25519 Private Key)
-    A->>B: 2. Transmit Encrypted Radio Packet (Cluster Key)
-    Note over B: 3. Intermediate phone decrypts packet.<br/>Tampering with payload invalidates author signature!
+    Note over A: 1. Author signs mutation:<br/>Sign(Payload + HLC,<br/>Ed25519 Private Key)
+    A->>B: 2. Transmit Encrypted Packet<br/>(Cluster Key)
+    Note over B: 3. Intermediate phone inspects packet.<br/>Tampering with payload invalidates<br/>author signature!
     B->>C: 4. Relay packet over next BLE hop
-    Note over C: 5. Verify Ed25519 Signature against Dr. Budi's Public Key.<br/>Tampered packet is immediately rejected and dropped.
+    Note over C: 5. Verify Ed25519 Signature against<br/>Author Public Key.<br/>Tampered record rejected & dropped!
 ```
 
 ---

@@ -36,11 +36,11 @@ Whether you are coordinating emergency disaster relief in camps without cellular
 
 ```mermaid
 flowchart TD
-    App["Application Layer<br/>(Domain Entities, Disaster Triage, POS, Sensor Logs)"]
+    App["Application Layer<br/>(Domain Entities, Triage, POS, Logs)"]
 
     subgraph PersistenceTier ["Persistence Layer (Pluggable Seam)"]
-        SQLite["airdb-adapter-sqlite / SqliteDbAdapter<br/>WAL Mode • Append-Only Changelog • Tombstones"]
-        BYOD["Bring Your Own Database (BYOD)<br/>Room • SQLDelight • GRDB • SwiftData • In-Memory"]
+        SQLite["airdb-adapter-sqlite<br/>(SqliteDbAdapter)<br/>WAL Mode • Changelog Index<br/>Tombstone Soft-Deletes"]
+        BYOD["Bring Your Own Database<br/>(BYOD Adapters)<br/>Room • SQLDelight • GRDB<br/>SwiftData • In-Memory KV"]
     end
 
     subgraph EngineTier ["Reconciliation & Causality Core"]
@@ -48,16 +48,16 @@ flowchart TD
     end
 
     subgraph SecurityTier ["Zero-Trust Cryptographic Mesh"]
-        Crypto["airdb-crypto / AirDbKit Crypto<br/>ChaCha20-Poly1305 AEAD • Ed25519 Signatures • HKDF-SHA256"]
+        Crypto["airdb-crypto / AirDbKit Crypto<br/>ChaCha20-Poly1305 AEAD • Ed25519 Signatures<br/>RFC 5869 HKDF-SHA256 Key Schedule"]
     end
 
     subgraph ProtocolTier ["Wire Codec & MTU Framing"]
-        Protocol["airdb-protocol / AirDbKit Protocol<br/>Compact Binary Header • zlib Deflate • 13-Byte MTU Envelope"]
+        Protocol["airdb-protocol / AirDbKit Protocol<br/>Compact Binary Header • zlib Deflate<br/>13-Byte MTU Envelope & AssemblyBuffer"]
     end
 
     subgraph TransportTier ["Transport Abstraction (AirDbTransport)"]
-        BLE["airdb-transport-ble / CoreBluetoothTransport<br/>Dual-Role Central + Peripheral • Single-Flight GATT Queue"]
-        Sim["airdb-transport-sim / SimulatedTransport<br/>Sans-I/O In-Memory Multi-Node Mesh Simulation"]
+        BLE["airdb-transport-ble<br/>CoreBluetoothTransport<br/>Central + Peripheral Roles<br/>Single-Flight GATT Queue"]
+        Sim["airdb-transport-sim<br/>SimulatedTransport<br/>Sans-I/O In-Memory<br/>Multi-Node Mesh Lab"]
     end
 
     App --> PersistenceTier

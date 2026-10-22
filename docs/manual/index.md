@@ -10,11 +10,11 @@ AirDB is structured into five distinct, decoupled layers:
 
 ```mermaid
 flowchart TD
-    L1["1. Application Layer<br/>(Domain Entities, Triage, Sales, Inventory)"]
-    L2["2. Persistence Seam (AirDbAdapter)<br/>• Durable SQLite with WAL mode (Android & Apple)<br/>• Pluggable Adapters: Room, SQLDelight, GRDB, SwiftData"]
-    L3["3. Causality & Synchronization (AirDbEngine & SyncSession)<br/>• Hybrid Logical Clocks (HLC) for deterministic total ordering<br/>• Vector Clocks for tracking peer state & computing delta sets<br/>• 4-Phase Sync Protocol (Handshake, Clock, Delta, Ack)<br/>• Last-Write-Wins (LWW) conflict resolution & tombstones"]
-    L4["4. Zero-Trust Cryptographic Mesh<br/>• RFC 8439 ChaCha20-Poly1305 AEAD (Cluster link encryption)<br/>• Header Authenticated Additional Data (AAD) tamper rejection<br/>• RFC 8032 Ed25519 digital signatures (Record author proof)<br/>• RFC 5869 HKDF-SHA256 key derivation schedule"]
-    L5["5. Wire Codecs & Radio Transports<br/>• Binary packet framing (AirDbPacket) & zlib compression (>256B)<br/>• MTU fragmentation with 30s sliding AssemblyBuffer<br/>• Dual-role BLE concurrency (Central + Peripheral)<br/>• Android single-flight GattOperationQueue & Apple Swift Actor<br/>• Sans-I/O in-memory simulator for instant testing"]
+    L1["<b>1. Application Layer</b><br/>Domain Entities • Disaster Triage<br/>POS Registers • Sensor & Audit Logs"]
+    L2["<b>2. Persistence Seam (AirDbAdapter)</b><br/>• Durable SQLite with WAL mode<br/>• Out-of-the-box Android & Apple support<br/>• Pluggable: Room, SQLDelight, GRDB, SwiftData"]
+    L3["<b>3. Causality & Synchronization Core</b><br/>• Hybrid Logical Clocks for deterministic ordering<br/>• Vector Clocks for peer delta tracking<br/>• 4-Phase Sync Protocol (Handshake, Delta, Ack)<br/>• Last-Write-Wins conflict resolution & tombstones"]
+    L4["<b>4. Zero-Trust Cryptographic Mesh</b><br/>• RFC 8439 ChaCha20-Poly1305 AEAD encryption<br/>• Header AAD binding for instant tamper rejection<br/>• RFC 8032 Ed25519 author digital signatures<br/>• RFC 5869 HKDF-SHA256 key derivation schedule"]
+    L5["<b>5. Wire Codecs & Radio Transports</b><br/>• Binary framing & zlib Deflate compression<br/>• MTU chunking with 30s sliding AssemblyBuffer<br/>• Dual-role BLE concurrency (Central + Peripheral)<br/>• Android single-flight queue & Apple actor<br/>• Sans-I/O in-memory simulator for unit tests"]
 
     L1 --> L2
     L2 --> L3

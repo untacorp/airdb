@@ -70,24 +70,24 @@ When two devices connect over Bluetooth Low Energy, they execute a 4-step conver
 
 ```mermaid
 sequenceDiagram
-    participant A as Device A (Scanner / Central)
-    participant B as Device B (Advertiser / Peripheral)
+    participant A as Device A (Central)
+    participant B as Device B (Peripheral)
 
     Note over A,B: Phase 1 & 2: Identity & Cluster Authentication
-    A->>B: Phase 1: HANDSHAKE (NodeID, Protocol Version)
-    B-->>A: Phase 2: HANDSHAKE_ACK (Cluster Verified, Session OK)
+    A->>B: Phase 1: HANDSHAKE (NodeID, Protocol Ver)
+    B-->>A: Phase 2: HANDSHAKE_ACK (Session Verified)
 
     Note over A,B: Phase 3: Reconciliation & Delta Streaming
     A->>B: Phase 3a: RECONCILE_REQ (Vector Clock A)
     B-->>A: Phase 3b: RECONCILE_RESP (Vector Clock B)
-    B->>A: Phase 3c: DELTA_BATCH (Missing changes B -> A)
-    A->>B: Phase 3d: DELTA_BATCH (Missing changes A -> B)
+    B->>A: Phase 3c: DELTA_BATCH (Changes B -> A)
+    A->>B: Phase 3d: DELTA_BATCH (Changes A -> B)
 
     Note over A,B: Phase 4: Acknowledgment & Convergence
-    A-->>B: Phase 4: DELTA_ACK (Confirm batch applied)
-    B-->>A: Phase 4: DELTA_ACK (Confirm batch applied)
+    A-->>B: Phase 4: DELTA_ACK (Batch Applied)
+    B-->>A: Phase 4: DELTA_ACK (Batch Applied)
 
-    Note over A,B: State: SYNCHRONIZED (Live Mutations Stream in Real-Time)
+    Note over A,B: State: SYNCHRONIZED<br/>Live Mutations Stream in Real-Time
 ```
 
 ### Mesh Convergence Latency

@@ -10,14 +10,14 @@ AirDB releases adhere to strict decentralization, cryptographic integrity, and z
 
 ```mermaid
 flowchart TD
-    A["Release Trigger (Git Tag vX.Y.Z)"] --> B["Pre-Flight Checklist & Audit"]
-    B --> C["Automated CI/CD Pipeline"]
-    C --> D["Maven Central (Android/JVM)"]
-    C --> E["Swift Package Manager (Apple)"]
-    C --> F["GitHub Releases & Checksums"]
-    D --> G["Verified Artifacts on repo1.maven.org"]
-    E --> H["Indexed on Swift Package Index"]
-    F --> I["Offline Bundles & SHA-256 Hashes"]
+    A["Release Trigger<br/>(Git Tag vX.Y.Z)"] --> B["Pre-Flight Checklist<br/>& Security Audit"]
+    B --> C["Automated CI/CD<br/>Release Pipeline"]
+    C --> D["Maven Central<br/>(Android / JVM)"]
+    C --> E["Swift Package Manager<br/>(Apple Platforms)"]
+    C --> F["GitHub Releases<br/>& Checksums"]
+    D --> G["Verified Artifacts<br/>repo1.maven.org"]
+    E --> H["Indexed Package<br/>Swift Package Index"]
+    F --> I["Offline Bundles<br/>SHA-256 Hashes"]
 ```
 
 ### Pillar 1: Semantic Versioning and Changelog Standards
