@@ -57,4 +57,12 @@ public protocol AirDbTransport: AnyObject, Sendable {
 
     /// Set event listener for inbound packets and link state updates.
     func setListener(_ listener: TransportListener)
+
+    /// Configures the symmetric AEAD cluster key for encrypting outbound packets
+    /// and authenticating/decrypting inbound packets.
+    func setClusterKey(_ key: Data?)
+}
+
+public extension AirDbTransport {
+    func setClusterKey(_ key: Data?) {}
 }

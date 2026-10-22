@@ -29,6 +29,7 @@ public struct BleConfig: @unchecked Sendable {
     public let maxPendingBytes: Int
     public let sendRetryDelayMs: UInt64
     public let maxCallbackRetries: Int
+    public let clusterKey: Data?
 
     public init(
         serviceUuid: CBUUID = CBUUID(string: "41697244-4200-0000-8000-00805F9B34FB"),
@@ -39,7 +40,8 @@ public struct BleConfig: @unchecked Sendable {
         maxPendingQueueSize: Int = 256,
         maxPendingBytes: Int = 1_048_576,
         sendRetryDelayMs: UInt64 = 15,
-        maxCallbackRetries: Int = 3
+        maxCallbackRetries: Int = 3,
+        clusterKey: Data? = nil
     ) {
         self.serviceUuid = serviceUuid
         self.characteristicUuid = characteristicUuid
@@ -50,6 +52,7 @@ public struct BleConfig: @unchecked Sendable {
         self.maxPendingBytes = maxPendingBytes
         self.sendRetryDelayMs = sendRetryDelayMs
         self.maxCallbackRetries = maxCallbackRetries
+        self.clusterKey = clusterKey
     }
 }
 
@@ -80,11 +83,19 @@ public final class CoreBluetoothTransport: NSObject, AirDbTransport, @unchecked 
 
     // Reassembly buffer per link
     private var assemblyBuffers: [String: AssemblyBuffer] = [:]
+    private var clusterKey: Data?
     private let lock = NSLock()
 
     public init(config: BleConfig = BleConfig()) {
         self.config = config
+        self.clusterKey = config.clusterKey
         super.init()
+    }
+
+    public func setClusterKey(_ key: Data?) {
+        lock.lock()
+        self.clusterKey = key
+        lock.unlock()
     }
 
     public func setListener(_ listener: TransportListener) {
@@ -150,15 +161,19 @@ public final class CoreBluetoothTransport: NSObject, AirDbTransport, @unchecked 
                     return
                 }
 
+                let currentKey = self.lock.withScopedLock { self.clusterKey }
                 let fragments = PacketFragmenter.fragment(
                     packet: packet,
+                    clusterKey: currentKey,
                     maxChunkSize: self.config.maxFragmentChunkSize
                 )
 
                 var sentAny = false
 
                 for fragment in fragments {
-                    let encoded = BinaryCodec.encode(fragment)
+                    let encoded = fragment.type == .fragment
+                        ? BinaryCodec.encode(fragment)
+                        : BinaryCodec.encode(fragment, clusterKey: currentKey)
 
                     // 1. Send to matching connected Peripherals (as Central)
                     for (uuid, entry) in self.activePeripherals {
@@ -247,7 +262,8 @@ public final class CoreBluetoothTransport: NSObject, AirDbTransport, @unchecked 
     // MARK: - Ingestion & Reassembly
 
     private func handleInboundData(_ data: Data, peerId: String, linkId: String) {
-        guard let rawPacket = BinaryCodec.decode(data) else { return }
+        let currentKey = lock.withScopedLock { self.clusterKey }
+        guard let rawPacket = BinaryCodec.decode(data, clusterKey: currentKey) else { return }
 
         let packetToDeliver: AirDbPacket
         if rawPacket.type == .fragment {
@@ -256,12 +272,16 @@ public final class CoreBluetoothTransport: NSObject, AirDbTransport, @unchecked 
             assemblyBuffers[linkId] = buffer
             lock.unlock()
 
-            guard let assembled = buffer.ingest(rawPacket) else {
+            guard let assembled = buffer.ingest(rawPacket, clusterKey: currentKey) else {
                 return
             }
             packetToDeliver = assembled
         } else {
             packetToDeliver = rawPacket
+        }
+
+        if currentKey != nil && !packetToDeliver.isEncrypted {
+            return
         }
 
         lock.lock()
