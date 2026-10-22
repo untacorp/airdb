@@ -45,12 +45,13 @@ Public release announcements on GitHub Releases must adhere to the following sch
 ### Pillar 3: Multi-Platform Artifact Inventory
 
 #### A. Maven Central (JVM & Android)
-Under the verified namespace `io.github.untacorp`, the following 8 artifacts are published:
+Under the verified namespace `io.github.untacorp`, the following 9 artifacts are published:
 - `io.github.untacorp:airdb-core`
 - `io.github.untacorp:airdb-crypto`
 - `io.github.untacorp:airdb-protocol`
 - `io.github.untacorp:airdb-adapter-api`
 - `io.github.untacorp:airdb-adapter-sqlite`
+- `io.github.untacorp:airdb-adapter-aerolog`
 - `io.github.untacorp:airdb-transport-api`
 - `io.github.untacorp:airdb-transport-ble`
 - `io.github.untacorp:airdb-transport-sim`
@@ -72,7 +73,7 @@ Distributed directly via Git release tags on the primary repository:
 - Zero third-party dependencies: Built exclusively against standard Apple frameworks (`Foundation`, `CryptoKit`, `CoreBluetooth`, `libsqlite3`).
 
 #### C. GitHub Release Assets
-- `airdb-maven-bundle-X.Y.Z.zip`: Complete offline deployment bundle containing all 8 Maven Central modules.
+- `airdb-maven-bundle-X.Y.Z.zip`: Complete offline deployment bundle containing all 9 Maven Central modules.
 - `SHA256SUMS.txt`: Cryptographic checksum file for all attached binaries.
 
 ---

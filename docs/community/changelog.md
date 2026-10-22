@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] - 2026-10-22
+
+### Added
+- **AeroLog Native Storage Engine (`airdb-adapter-aerolog`)**:
+  - High-throughput Append-Only Bitcask persistence adapter wrapping pure-Rust AeroLog via Mozilla UniFFI.
+  - Over 200,000 sequential writes/sec with hardware-accelerated CRC32-IEEE checksums and zero random flash I/O.
+  - Single-seek in-memory `KeyDir` indexing with sub-15-microsecond point read latency.
+  - Native Hybrid Logical Clock (HLC) physical-logical tuple alignment.
+  - Automatic segment compaction and tombstone garbage collection past prune HLC thresholds.
+- **Apple Platform BYOD Integration Seam**:
+  - Comprehensive documentation and reference implementation for Bring-Your-Own-Database (BYOD) AeroLog integration on iOS and macOS.
+  - Enforced Invariant 6 preserving zero third-party SPM dependencies in `AirDbKit`.
+- **Visual Performance & Architecture Metrics**:
+  - Modernized MkDocs architecture diagrams using Mermaid and `xychart-beta` visual throughput charts.
+
+### Fixed
+- **Consolidated Audit Resolutions (Issues #9 to #20 via PR #33)**:
+  - **Reconciliation Starvation (#9)**: Added continuous delta batch streaming to prevent peer starvation under heavy write workloads.
+  - **BLE Transport Wire Framing (#10)**: Corrected packet encryption layering and AEAD header binding across Android and Apple transports.
+  - **SQLite Changelog Scan OOM (#11)**: Implemented chunked pagination cursor (`readChangelogSince`) to prevent heap exhaustion.
+  - **HLC Canonical Ordering (#12)**: Standardized HLC comparator parsing and total order across Kotlin and Swift.
+  - **GATT Operation Queue Watchdog (#13, #14)**: Added retry budget limits and watchdog timers to prevent Android BLE queue hangs.
+  - **AeroLog Changelog Ceiling (#15)**: Added 10,000-entry safety fetch ceiling on stream scans to protect memory bounds.
+  - **CoreBluetooth ATT Write Drain (#16)**: Added backpressure drain tracking `peripheralIsReady(toSendWriteWithoutResponse:)`.
+  - **Zip-Bomb Protection (#17)**: Enforced strict 64KB max decompressed payload budget in `BinaryCodec`.
+  - **SQLite Tombstone Indexing (#18)**: Added composite `(physical_time, logical_counter, origin_node)` indexes and atomic changelog compaction.
+  - **Swift Concurrency Hardening (#19)**: Replaced unstructured detached tasks with structured actor tasks and clean lifecycle cancellation.
+  - **Kotlin Concurrency Alignment (#20)**: Aligned coroutine dispatchers and lifecycle management with Kotlin Multiplatform standards.
+- **AeroLog Cache & Tombstone Compaction**:
+  - Restored O(1) `maxSeenHlc` tracking in `AeroLogAirDbAdapter` on `appendChangelog` and `applyChanges`.
+  - Implemented KeyDir tombstone purging before executing Bitcask segment compaction.
+
+### Refactored
+- **Linux Kernel Filter Discipline (PR #34)**:
+  - Stripped narrative comments and cognitive bloat across Kotlin and Swift codebases.
+  - Flattened nested conditionals using guard clauses and bouncer pattern (Linus' 3-indent law).
+  - Normalized variable naming, replacing cryptic abbreviations (`pt`, `lc`, `nh`, `mut`) and corporate filler with precise domain nouns (`physicalTime`, `logicalCounter`, `originNode`, `nodeHash`).
+  - Achieved net-negative lines while maintaining 100% test pass rates across both Linux and macOS CI.
+
+---
+
 ## [0.2.0] - 2026-10-21
 
 ### Added
