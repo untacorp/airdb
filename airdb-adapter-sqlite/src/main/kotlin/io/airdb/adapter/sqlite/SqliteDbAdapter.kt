@@ -226,6 +226,7 @@ class SqliteDbAdapter(
                 stmt.setString(5, record.hlcTimestamp)
                 stmt.setLong(6, System.currentTimeMillis())
                 stmt.executeUpdate()
+                updateMaxSeenHlc(record.hlcTimestamp)
             }
         }
         Unit
@@ -277,6 +278,7 @@ class SqliteDbAdapter(
                                     changelogStmt.setString(5, change.hlcTimestamp)
                                     changelogStmt.setLong(6, now)
                                     changelogStmt.executeUpdate()
+                                    updateMaxSeenHlc(change.hlcTimestamp)
                                 }
                             }
                         }

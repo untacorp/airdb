@@ -221,4 +221,30 @@ final class SqliteDbAdapterTests: XCTestCase {
 
         await adapter.close()
     }
+
+    func testLatestHlcDoesNotRegressOnOlderHistoricalSync() async throws {
+        let adapter = try SqliteDbAdapter.inMemory()
+
+        // Local record created at newer HLC (seq = 1)
+        let localRec = ChangeRecord(id: "local-1", collection: "docs", type: .insert, payload: Data([1]), hlcTimestamp: "1700000000000-0-nodeA")
+        try await adapter.applyChanges([localRec])
+        let hlc1 = try await adapter.getLatestHlc()
+        XCTAssertEqual(hlc1, "1700000000000-0-nodeA")
+
+        // Historical record synced from peer with older HLC (seq = 2)
+        let peerRec = ChangeRecord(id: "peer-historical", collection: "docs", type: .insert, payload: Data([2]), hlcTimestamp: "1600000000000-0-nodeB")
+        try await adapter.applyChanges([peerRec])
+
+        // getLatestHlc must not regress to peer-historical
+        let hlc2 = try await adapter.getLatestHlc()
+        XCTAssertEqual(hlc2, "1700000000000-0-nodeA")
+
+        // Higher logical counter must become latest
+        let counterRec = ChangeRecord(id: "local-2", collection: "docs", type: .insert, payload: Data([3]), hlcTimestamp: "1700000000000-10-nodeA")
+        try await adapter.applyChanges([counterRec])
+        let hlc3 = try await adapter.getLatestHlc()
+        XCTAssertEqual(hlc3, "1700000000000-10-nodeA")
+
+        await adapter.close()
+    }
 }

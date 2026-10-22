@@ -114,13 +114,50 @@ public actor AdaptiveAirDbAdapter: AirDbAdapter {
                 )
                 try await self.storage.writeEntity(entity)
                 try await self.storage.appendChangelog(change)
+                self.updateMaxSeenHlc(change.hlcTimestamp)
             }
         }
     }
 
+    private var maxSeenHlc: String?
+
+    private func updateMaxSeenHlc(_ hlc: String) {
+        if let current = maxSeenHlc {
+            if HlcComparator.compare(hlc, current) == .orderedDescending {
+                maxSeenHlc = hlc
+            }
+        } else {
+            maxSeenHlc = hlc
+        }
+    }
+
     public func getLatestHlc() async throws -> String? {
-        let changelog = try await storage.readChangelogSince(sinceHlcTimestamp: nil, limit: 1000)
-        return changelog.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })?.hlcTimestamp
+        if let cached = maxSeenHlc {
+            return cached
+        }
+
+        var cursor: String? = nil
+        var maxHlc: String? = nil
+        let pageSize = 1000
+
+        while true {
+            let batch = try await storage.readChangelogSince(sinceHlcTimestamp: cursor, limit: pageSize)
+            if batch.isEmpty { break }
+            for record in batch {
+                if let current = maxHlc {
+                    if HlcComparator.compare(record.hlcTimestamp, current) == .orderedDescending {
+                        maxHlc = record.hlcTimestamp
+                    }
+                } else {
+                    maxHlc = record.hlcTimestamp
+                }
+            }
+            if batch.count < pageSize { break }
+            cursor = batch.last?.hlcTimestamp
+        }
+
+        maxSeenHlc = maxHlc
+        return maxHlc
     }
 
     public func readEntity(collection: String, id: String) async throws -> StoredEntity? {

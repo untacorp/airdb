@@ -168,4 +168,35 @@ class SqliteDbAdapterTest {
             assertTrue(missing.any { it.id == "e-3" })
         }
     }
+
+    @Test
+    fun testLatestHlcDoesNotRegressOnOlderHistoricalSync() = runBlocking {
+        SqliteDbAdapter.inMemory().use { adapter ->
+            // Local record created at newer HLC (seq = 1)
+            adapter.applyChanges(
+                listOf(
+                    ChangeRecord("local-1", "docs", MutationType.INSERT, "v1".toByteArray(), "1700000000000-0-nodeA")
+                )
+            )
+            assertEquals("1700000000000-0-nodeA", adapter.getLatestHlc())
+
+            // Historical record synced from peer with older HLC (seq = 2)
+            adapter.applyChanges(
+                listOf(
+                    ChangeRecord("peer-historical", "docs", MutationType.INSERT, "v0".toByteArray(), "1600000000000-0-nodeB")
+                )
+            )
+
+            // getLatestHlc MUST NOT regress to the older timestamp just because it was inserted later (seq = 2)
+            assertEquals("1700000000000-0-nodeA", adapter.getLatestHlc())
+
+            // And counter ordering must be respected
+            adapter.applyChanges(
+                listOf(
+                    ChangeRecord("local-2", "docs", MutationType.INSERT, "v2".toByteArray(), "1700000000000-10-nodeA")
+                )
+            )
+            assertEquals("1700000000000-10-nodeA", adapter.getLatestHlc())
+        }
+    }
 }
