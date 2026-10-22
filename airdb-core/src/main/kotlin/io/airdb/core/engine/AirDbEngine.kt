@@ -59,6 +59,9 @@ class AirDbEngine(
     private var isStarted = false
 
     init {
+        if (clusterKey != null) {
+            transport.setClusterKey(clusterKey)
+        }
         transport.setListener(this)
     }
 

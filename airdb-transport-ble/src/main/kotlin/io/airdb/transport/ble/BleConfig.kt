@@ -64,5 +64,47 @@ data class BleConfig(
     val maxCallbackRetries: Int = 3,
 
     /** Radio power and discovery latency profile. Defaults to BALANCED with LOW_LATENCY option. */
-    val powerMode: BlePowerMode = BlePowerMode.BALANCED
-)
+    val powerMode: BlePowerMode = BlePowerMode.BALANCED,
+
+    /** Optional 256-bit symmetric AEAD cluster key for ChaCha20-Poly1305 payload encryption. */
+    val clusterKey: ByteArray? = null
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as BleConfig
+
+        if (serviceUuid != other.serviceUuid) return false
+        if (characteristicUuid != other.characteristicUuid) return false
+        if (cccdUuid != other.cccdUuid) return false
+        if (targetMtu != other.targetMtu) return false
+        if (maxFragmentChunkSize != other.maxFragmentChunkSize) return false
+        if (maxPendingQueueSize != other.maxPendingQueueSize) return false
+        if (maxPendingBytes != other.maxPendingBytes) return false
+        if (sendRetryDelayMs != other.sendRetryDelayMs) return false
+        if (maxCallbackRetries != other.maxCallbackRetries) return false
+        if (powerMode != other.powerMode) return false
+        if (clusterKey != null) {
+            if (other.clusterKey == null) return false
+            if (!clusterKey.contentEquals(other.clusterKey)) return false
+        } else if (other.clusterKey != null) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = serviceUuid.hashCode()
+        result = 31 * result + characteristicUuid.hashCode()
+        result = 31 * result + cccdUuid.hashCode()
+        result = 31 * result + targetMtu
+        result = 31 * result + maxFragmentChunkSize
+        result = 31 * result + maxPendingQueueSize
+        result = 31 * result + maxPendingBytes
+        result = 31 * result + sendRetryDelayMs.hashCode()
+        result = 31 * result + maxCallbackRetries
+        result = 31 * result + powerMode.hashCode()
+        result = 31 * result + (clusterKey?.contentHashCode() ?: 0)
+        return result
+    }
+}

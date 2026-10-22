@@ -86,4 +86,44 @@ final class SimulatedSyncTests: XCTestCase {
         engineA.stop()
         engineB.stop()
     }
+
+    func testEncryptedMeshReplicationConvergence() async throws {
+        let network = SimulatedNetwork()
+        let clusterKey = Data(repeating: 0xEE, count: 32)
+
+        let adapterA = MemoryDbAdapter()
+        let transportA = SimulatedTransport(nodeId: "node-enc-a", network: network)
+        let engineA = AirDbEngine(nodeName: "node-enc-a", adapter: adapterA, transport: transportA, clusterKey: clusterKey)
+
+        let adapterB = MemoryDbAdapter()
+        let transportB = SimulatedTransport(nodeId: "node-enc-b", network: network)
+        let engineB = AirDbEngine(nodeName: "node-enc-b", adapter: adapterB, transport: transportB, clusterKey: clusterKey)
+
+        _ = try await engineA.saveRecord(
+            collection: "patients",
+            id: "p-enc-001",
+            type: .insert,
+            payload: Data("{\"name\": \"Secret Survivor\"}".utf8)
+        )
+
+        engineA.start()
+        engineB.start()
+
+        let deadline = Date().addingTimeInterval(2.0)
+        var converged = false
+
+        while Date() < deadline {
+            let record = await adapterB.getRecord(collection: "patients", id: "p-enc-001")
+            if record != nil {
+                converged = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+
+        XCTAssertTrue(converged, "Encrypted record should replicate across clusterKey-authenticated nodes")
+
+        engineA.stop()
+        engineB.stop()
+    }
 }

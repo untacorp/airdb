@@ -90,5 +90,21 @@ final class CoreBluetoothTransportTests: XCTestCase {
         // Transport initializes safely with listener registered
         XCTAssertNotNil(transport)
     }
+
+    func testBleConfigWithClusterKey() {
+        let key = Data(repeating: 0xAB, count: 32)
+        let config = BleConfig(clusterKey: key)
+        XCTAssertEqual(config.clusterKey, key)
+
+        let transport = CoreBluetoothTransport(config: config)
+        XCTAssertNotNil(transport)
+    }
+
+    func testSetClusterKeyUpdatesTransportKey() {
+        let transport = CoreBluetoothTransport()
+        let key = Data(repeating: 0xCD, count: 32)
+        transport.setClusterKey(key)
+        XCTAssertNotNil(transport)
+    }
 }
 #endif

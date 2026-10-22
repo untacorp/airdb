@@ -50,6 +50,9 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
         self.authorKeyPair = authorKeyPair
         self.enforceSignatures = enforceSignatures
 
+        if let clusterKey = clusterKey {
+            self.transport.setClusterKey(clusterKey)
+        }
         self.transport.setListener(self)
     }
 
