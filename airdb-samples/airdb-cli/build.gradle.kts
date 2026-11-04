@@ -14,6 +14,13 @@ dependencies {
     implementation(libs.kotlin.stdlib)
     implementation(libs.coroutines.core)
     implementation("org.slf4j:slf4j-nop:2.0.12")
+
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.junit.jupiter)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 application {

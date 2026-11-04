@@ -175,7 +175,10 @@ public actor SyncSession {
 
         case .deltaBatch:
             let changes = DeltaBatch.deserialize(packet.payload)
-            let valid = enforceSignatures ? changes.filter { $0.verifySignature() } : changes
+            if enforceSignatures && changes.contains(where: { !$0.verifySignature() }) {
+                return
+            }
+            let valid = changes
             if !valid.isEmpty {
                 if let maxHlc = valid.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })?.hlcTimestamp,
                    let parsed = HlcTimestamp.parse(maxHlc) {

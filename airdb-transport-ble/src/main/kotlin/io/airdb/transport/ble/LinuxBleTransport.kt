@@ -319,6 +319,18 @@ class LinuxBleTransport(
                     }
                     handleInboundBytes(data, peerId = peerAddress, linkId = linkId)
                 },
+                onNotifyStateChanged = { notifying ->
+                    if (!notifying) {
+                        for (peerAddress in connectedServerCentrals) {
+                            val linkId = "server-$peerAddress"
+                            connectedServerCentrals.remove(peerAddress)
+                            assemblyBuffers.remove(linkId)
+                            gattQueue?.onLinkDisconnected(linkId)
+                            log("server link down: $peerAddress ($linkId)")
+                            listener?.onTransportEvent(TransportEvent.LinkDisconnected(peerAddress, linkId))
+                        }
+                    }
+                },
                 log = { msg -> log(msg) }
             )
             server.start()
@@ -415,8 +427,10 @@ class LinuxBleTransport(
             // 2. Dispatch to subscribed Centrals via GATT Server notifications
             val server = gattServer
             if (server != null && server.isNotifying.get()) {
-                if (server.notify(encoded)) {
-                    anyDispatched = true
+                if (targetPeerId == null || connectedServerCentrals.contains(targetPeerId)) {
+                    if (server.notify(encoded)) {
+                        anyDispatched = true
+                    }
                 }
             }
         }

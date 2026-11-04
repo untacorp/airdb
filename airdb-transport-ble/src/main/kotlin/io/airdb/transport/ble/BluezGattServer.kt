@@ -45,6 +45,7 @@ internal class BluezGattServer(
     private val serviceUuid: String,
     private val characteristicUuid: String,
     private val onCharacteristicWrite: (data: ByteArray, devicePath: String?) -> Unit,
+    private val onNotifyStateChanged: (Boolean) -> Unit = {},
     private val log: (String) -> Unit = {}
 ) {
     private val appPath = "/io/airdb"
@@ -71,6 +72,7 @@ internal class BluezGattServer(
                 onNotifyStateChanged = { notifying ->
                     isNotifying.set(notifying)
                     log("client notify: $notifying")
+                    onNotifyStateChanged(notifying)
                 }
             )
             val objManager = AirDbObjectManager(

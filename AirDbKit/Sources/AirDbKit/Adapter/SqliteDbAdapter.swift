@@ -389,6 +389,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
         let components = HlcComparator.parseHlcComponents(pruneHlcThreshold)
         let thresholdPt = components?.pt ?? 0
         let thresholdLc = components?.lc ?? 0
+        let thresholdNode = components?.node ?? ""
 
         try executeSimple("BEGIN IMMEDIATE TRANSACTION;")
         do {
@@ -418,7 +419,11 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
 
             let deleteChangelogSql = """
             DELETE FROM airdb_changelog 
-            WHERE type = ? AND (physical_time < ? OR (physical_time = ? AND logical_counter <= ?));
+            WHERE type = ? AND (
+                physical_time < ? 
+                OR (physical_time = ? AND logical_counter < ?) 
+                OR (physical_time = ? AND logical_counter = ? AND origin_node < ?)
+            );
             """
             var deleteChangelogStmt: OpaquePointer?
             defer { sqlite3_finalize(deleteChangelogStmt) }
@@ -430,7 +435,12 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
             sqlite3_bind_int(deleteChangelogStmt, 1, Int32(MutationType.delete.rawValue))
             sqlite3_bind_int64(deleteChangelogStmt, 2, thresholdPt)
             sqlite3_bind_int64(deleteChangelogStmt, 3, thresholdPt)
-            sqlite3_bind_int64(deleteChangelogStmt, 4, Int64(thresholdLc))
+            sqlite3_bind_int(deleteChangelogStmt, 4, Int32(thresholdLc))
+            sqlite3_bind_int64(deleteChangelogStmt, 5, thresholdPt)
+            sqlite3_bind_int(deleteChangelogStmt, 6, Int32(thresholdLc))
+            thresholdNode.withCString { nodeStr in
+                sqlite3_bind_text(deleteChangelogStmt, 7, nodeStr, -1, sqliteTransient)
+            }
 
             if sqlite3_step(deleteChangelogStmt) != SQLITE_DONE {
                 throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))

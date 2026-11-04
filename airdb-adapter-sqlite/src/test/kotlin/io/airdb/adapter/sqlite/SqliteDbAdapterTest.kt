@@ -207,4 +207,37 @@ class SqliteDbAdapterTest {
             assertEquals("1700000000000-10-nodeA", adapter.getLatestHlc())
         }
     }
+
+    @Test
+    fun testCompactionCompositeTieBreakingAndThresholdBoundary() = runBlocking {
+        SqliteDbAdapter.inMemory().use { adapter ->
+            // Insert and delete 3 records with identical physical time and logical counter across nodes
+            val tombstones = listOf(
+                ChangeRecord("doc-a", "docs", MutationType.DELETE, byteArrayOf(), "1000-0-nodeA"),
+                ChangeRecord("doc-b", "docs", MutationType.DELETE, byteArrayOf(), "1000-0-nodeB"),
+                ChangeRecord("doc-c", "docs", MutationType.DELETE, byteArrayOf(), "1000-0-nodeC")
+            )
+            adapter.applyChanges(tombstones)
+
+            // Compact against threshold 1000-0-nodeB
+            adapter.compact(pruneHlcThreshold = "1000-0-nodeB")
+
+            // 1000-0-nodeA (< threshold) must be pruned from both entities and changelog
+            assertFalse(adapter.isRecordDeleted("docs", "doc-a"))
+            assertNull(adapter.readEntity("docs", "doc-a"))
+
+            // 1000-0-nodeB (== threshold) must be retained in both entities and changelog
+            assertTrue(adapter.isRecordDeleted("docs", "doc-b"))
+            assertNotNull(adapter.readEntity("docs", "doc-b"))
+
+            // 1000-0-nodeC (> threshold) must be retained in both entities and changelog
+            assertTrue(adapter.isRecordDeleted("docs", "doc-c"))
+            assertNotNull(adapter.readEntity("docs", "doc-c"))
+
+            val changelog = adapter.readChangelogSince(null, 100)
+            assertFalse(changelog.any { it.id == "doc-a" })
+            assertTrue(changelog.any { it.id == "doc-b" })
+            assertTrue(changelog.any { it.id == "doc-c" })
+        }
+    }
 }

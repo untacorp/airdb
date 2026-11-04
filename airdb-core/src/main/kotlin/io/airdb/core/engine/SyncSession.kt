@@ -157,7 +157,11 @@ class SyncSession(
     private fun handleDeltaBatch(packet: AirDbPacket) {
         scope.launch {
             val raw = DeltaBatch.deserialize(packet.payload)
-            val changes = if (enforceSignatures) raw.filter { it.verifySignature() } else raw
+            if (enforceSignatures && raw.any { !it.verifySignature() }) {
+                // Reject invalid or unverified signature batches without acknowledging
+                return@launch
+            }
+            val changes = raw
             if (changes.isNotEmpty()) {
                 val maxRecord = changes.maxWithOrNull(Comparator.comparing({ it.hlcTimestamp }, HlcComparator))
                 maxRecord?.let { HlcTimestamp.parseOrNull(it.hlcTimestamp) }?.let { clock.update(it) }

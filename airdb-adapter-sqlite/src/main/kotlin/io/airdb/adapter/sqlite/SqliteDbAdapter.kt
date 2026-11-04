@@ -394,16 +394,24 @@ class SqliteDbAdapter(
             val thresholdComponents = HlcComparator.parseHlcComponents(pruneHlcThreshold)
             val thresholdPt = thresholdComponents?.first ?: 0L
             val thresholdLc = thresholdComponents?.second ?: 0
+            val thresholdNode = thresholdComponents?.third ?: ""
 
             val deleteChangelogSql = """
                 DELETE FROM airdb_changelog 
-                WHERE type = ? AND (physical_time < ? OR (physical_time = ? AND logical_counter <= ?))
+                WHERE type = ? AND (
+                    physical_time < ? 
+                    OR (physical_time = ? AND logical_counter < ?) 
+                    OR (physical_time = ? AND logical_counter = ? AND origin_node < ?)
+                )
             """.trimIndent()
             connection.prepareStatement(deleteChangelogSql).use { deleteStmt ->
                 deleteStmt.setInt(1, MutationType.DELETE.ordinal)
                 deleteStmt.setLong(2, thresholdPt)
                 deleteStmt.setLong(3, thresholdPt)
                 deleteStmt.setInt(4, thresholdLc)
+                deleteStmt.setLong(5, thresholdPt)
+                deleteStmt.setInt(6, thresholdLc)
+                deleteStmt.setString(7, thresholdNode)
                 deleteStmt.executeUpdate()
             }
         }

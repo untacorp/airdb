@@ -19,6 +19,7 @@ package io.airdb.cli
 import io.airdb.adapter.MutationType
 import io.airdb.adapter.sqlite.SqliteDbAdapter
 import io.airdb.core.engine.AirDbEngine
+import io.airdb.protocol.packet.AirDbPacket
 import io.airdb.transport.AirDbTransport
 import io.airdb.transport.TransportEvent
 import io.airdb.transport.TransportListener
@@ -53,6 +54,14 @@ fun main(args: Array<String>) = runBlocking {
     }
 
     val transport = object : AirDbTransport by rawTransport {
+        override suspend fun send(packet: AirDbPacket, targetPeerId: String?): Boolean {
+            val result = rawTransport.send(packet, targetPeerId)
+            if (result) {
+                txPackets.incrementAndGet()
+            }
+            return result
+        }
+
         override fun setListener(listener: TransportListener) {
             rawTransport.setListener(object : TransportListener {
                 override fun onTransportEvent(event: TransportEvent) {
@@ -118,7 +127,7 @@ fun main(args: Array<String>) = runBlocking {
             continue
         }
 
-        val parts = line.split("\\s+".toRegex())
+        val parts = line.split("\\s+".toRegex(), limit = 4)
         val cmd = parts[0].lowercase()
 
         when (cmd) {
@@ -136,7 +145,7 @@ fun main(args: Array<String>) = runBlocking {
                 println("  links                  list active BLE Central / Peripheral connections")
                 println("  radio                  show radio configuration and packet stats")
                 println("  status                 show causal HLC clock and vector clock")
-                println("  compact                prune tombstoned records")
+                println("  compact [hlc]          prune tombstoned records up to hlc threshold")
                 println("  log [on|off]           toggle live BLE driver trace logging")
                 println("  exit                   shutdown node and exit")
             }
@@ -227,9 +236,8 @@ fun main(args: Array<String>) = runBlocking {
                 } else {
                     val col = parts[1]
                     val id = parts[2]
-                    val payload = line.substringAfter(id).trim().toByteArray(Charsets.UTF_8)
+                    val payload = parts[3].toByteArray(Charsets.UTF_8)
                     val change = engine.saveRecord(col, id, MutationType.INSERT, payload)
-                    txPackets.incrementAndGet()
                     println("saved $id (hlc=${change.hlcTimestamp})")
                 }
             }
@@ -240,14 +248,13 @@ fun main(args: Array<String>) = runBlocking {
                     val col = parts[1]
                     val id = parts[2]
                     val change = engine.saveRecord(col, id, MutationType.DELETE, byteArrayOf())
-                    txPackets.incrementAndGet()
                     println("deleted $id (tombstone hlc=${change.hlcTimestamp})")
                 }
             }
             "compact" -> {
-                val latestHlc = db.getLatestHlc() ?: engine.clock.now().toString()
-                db.compact(latestHlc)
-                println("compaction completed against hlc $latestHlc")
+                val threshold = parts.getOrNull(1) ?: db.getLatestHlc() ?: engine.clock.now().toString()
+                db.compact(threshold)
+                println("compaction completed against hlc threshold $threshold")
             }
             "log" -> {
                 val linuxBle = rawTransport as? LinuxBleTransport

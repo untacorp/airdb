@@ -276,7 +276,8 @@ class AndroidBleTransport(
             gattQueue.onOperationComplete(linkId, status == BluetoothGatt.GATT_SUCCESS)
         }
 
-        @Suppress("DEPRECATION")
+        @Deprecated("Deprecated in Android API 33")
+        @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
             val data = characteristic.value ?: return
             handleInboundBytes(data, peerId = gatt.device.address, linkId = "client-${gatt.device.address}")
