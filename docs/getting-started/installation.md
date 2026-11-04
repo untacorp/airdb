@@ -29,22 +29,22 @@ AirDB is distributed through **Maven Central** and **GitHub Packages** for Andro
     ```kotlin
     dependencies {
         // Core synchronization engine and Hybrid Logical Clock
-        implementation("io.github.untacorp:airdb-core:0.2.0")
+        implementation("io.github.untacorp:airdb-core:0.2.2")
         
         // Zero-Trust cryptographic mesh (ChaCha20-Poly1305, Ed25519, HKDF)
-        implementation("io.github.untacorp:airdb-crypto:0.2.0")
+        implementation("io.github.untacorp:airdb-crypto:0.2.2")
         
         // Turnkey SQLite storage engine with Write-Ahead Logging (WAL)
-        implementation("io.github.untacorp:airdb-adapter-sqlite:0.2.0")
+        implementation("io.github.untacorp:airdb-adapter-sqlite:0.2.2")
         
-        // Android Bluetooth Low Energy hardware transport driver
-        implementation("io.github.untacorp:airdb-transport-ble:0.2.0")
+        // Android & Linux Bluetooth Low Energy hardware transport driver
+        implementation("io.github.untacorp:airdb-transport-ble:0.2.2")
         
         // (Optional) Wire protocol codec (pulled transitively by core)
-        implementation("io.github.untacorp:airdb-protocol:0.2.0")
+        implementation("io.github.untacorp:airdb-protocol:0.2.2")
 
         // (Optional) In-memory network simulator for automated unit tests
-        testImplementation("io.github.untacorp:airdb-transport-sim:0.2.0")
+        testImplementation("io.github.untacorp:airdb-transport-sim:0.2.2")
     }
     ```
 
@@ -77,10 +77,10 @@ AirDB is distributed through **Maven Central** and **GitHub Packages** for Andro
 
     ```kotlin
     dependencies {
-        implementation("io.github.untacorp:airdb-core:0.2.0")
-        implementation("io.github.untacorp:airdb-crypto:0.2.0")
-        implementation("io.github.untacorp:airdb-adapter-sqlite:0.2.0")
-        implementation("io.github.untacorp:airdb-transport-ble:0.2.0")
+        implementation("io.github.untacorp:airdb-core:0.2.2")
+        implementation("io.github.untacorp:airdb-crypto:0.2.2")
+        implementation("io.github.untacorp:airdb-adapter-sqlite:0.2.2")
+        implementation("io.github.untacorp:airdb-transport-ble:0.2.2")
     }
     ```
 
@@ -95,7 +95,7 @@ AirDB is distributed through **Maven Central** and **GitHub Packages** for Andro
        ```
        https://github.com/untacorp/airdb.git
        ```
-    4. Set the **Dependency Rule** to **Up to Next Major from `0.2.0`** (or **Exact `0.2.0`**).
+    4. Set the **Dependency Rule** to **Up to Next Major from `0.2.2`** (or **Exact `0.2.2`**).
     5. Choose your app target for `AirDbKit` and click **Add Package**.
 
     ### Option B: Using `Package.swift`
@@ -112,7 +112,7 @@ AirDB is distributed through **Maven Central** and **GitHub Packages** for Andro
             .macOS(.v12)
         ],
         dependencies: [
-            .package(url: "https://github.com/untacorp/airdb.git", from: "0.2.0")
+            .package(url: "https://github.com/untacorp/airdb.git", from: "0.2.2")
         ],
         targets: [
             .target(
@@ -208,7 +208,7 @@ All AirDB release artifacts are cryptographically signed to guarantee authentici
 To verify detached signatures locally:
 ```bash
 gpg --keyserver keyserver.ubuntu.com --recv-keys CEB164B84F724DCC
-gpg --verify airdb-core-0.2.0.jar.asc airdb-core-0.2.0.jar
+gpg --verify airdb-core-0.2.2.jar.asc airdb-core-0.2.2.jar
 ```
 
 ---

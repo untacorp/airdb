@@ -113,8 +113,8 @@ val clusterKey = HkdfSha256.deriveKey(
 )
 val authorKeyPair = Ed25519Signer.generateKeyPair()
 
-// 3. Initialize transport and engine
-val transport = AndroidBleTransport(context)
+// 3. Initialize transport and engine (Android or Linux BlueZ via factory)
+val transport = BleTransportFactory.create(androidContext = context)
 val engine = AirDbEngine(
     nodeName = "posko-merapi-1",
     adapter = adapter,

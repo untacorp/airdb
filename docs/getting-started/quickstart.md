@@ -15,7 +15,7 @@ AirDB encrypts all transmissions with a cluster key and signs each record with a
     import io.airdb.core.engine.AirDbEngine
     import io.airdb.crypto.Ed25519Signer
     import io.airdb.crypto.HkdfSha256
-    import io.airdb.transport.ble.AndroidBleTransport
+    import io.airdb.transport.ble.BleTransportFactory
     import java.io.File
 
     // 1. Open a durable SQLite database file
@@ -65,7 +65,9 @@ Connect the persistence adapter and the radio transport to create the central co
 
     ```kotlin
     // 4. Create the BLE transport and start the engine
-    val transport = AndroidBleTransport(context)
+    // Use BleTransportFactory for automatic Android / Linux BlueZ selection:
+    val transport = BleTransportFactory.create(androidContext = context)
+    // On Linux desktop/server: BleTransportFactory.create(nodeName = "posko-merapi-1")
     val engine = AirDbEngine(
         nodeName = "posko-merapi-1",
         adapter = adapter,

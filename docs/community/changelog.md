@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.2] - 2026-11-05
+
+### Added
+- **Linux Desktop BLE Dual-Role Mesh Driver (`airdb-transport-ble`)**:
+  - `LinuxBleTransport`: Dual-role Central (GATT client scanning via `blessed-bluez`) and Peripheral (LE advertising & GATT server via BlueZ D-Bus).
+  - `BluezGattServer`: Native D-Bus GATT service & characteristic implementation with `PropertiesChanged` signals and custom interface omitting non-exportable `FileDescriptor` types.
+  - `BleTransportFactory`: Dynamic runtime OS detection routing to Android, Linux, or Windows with explicit platform safety checks.
+  - Automatic `writeType` negotiation detecting `WITHOUT_RESPONSE` for high-throughput mobile mesh interop.
+  - Dynamic pairing passkey agent (`onPinRequest`) preventing D-Bus `NumberFormatException` during Bluetooth LE security negotiations.
+- **Interactive Node CLI Runner (`airdb-samples/airdb-cli`)**:
+  - Standalone terminal-based interactive node runner for Linux desktop with instantaneous prompt flushing and clean Unix-grade ergonomics.
+  - Mesh and radio observability commands: `peers` (RSSI & discovery state), `links` (active GATT connections), `radio` (adapter configuration and TX/RX packet statistics), `status` (HLC and Vector Clock), and `log [on|off]` (live driver tracing).
+  - Schemaless CRUD and compaction commands: `put`, `get`, `del` (tombstone generation), `list`, `cols`, and `compact`.
+- **Persistence Enhancements (`airdb-adapter-sqlite`)**:
+  - Added `getCollections(): List<String>` method to query distinct active collection namespaces.
+
+### Changed
+- Refactored `LinuxBleTransport` under kernel-filter discipline, silencing unrequested stdout logging by default and streamlining link lifecycle transitions.
+
+---
+
 ## [0.2.1] - 2026-10-22
 
 ### Added

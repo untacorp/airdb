@@ -56,7 +56,7 @@ flowchart TD
     end
 
     subgraph TransportTier ["Transport Abstraction (AirDbTransport)"]
-        BLE["airdb-transport-ble<br/>CoreBluetoothTransport<br/>Central + Peripheral Roles<br/>Single-Flight GATT Queue"]
+        BLE["airdb-transport-ble<br/>CoreBluetoothTransport<br/>(Android, Linux & Apple BLE)<br/>Central + Peripheral Roles<br/>Single-Flight GATT Queue"]
         Sim["airdb-transport-sim<br/>SimulatedTransport<br/>Sans-I/O In-Memory<br/>Multi-Node Mesh Lab"]
     end
 

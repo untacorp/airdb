@@ -39,6 +39,7 @@ AirDB does not force you to rewrite your entire database layer. You can use our 
 | Platform | Minimum Version | Language & Toolchain | Dependencies |
 |---|---|---|---|
 | **Android** | Android 8.0 (API 26+) | Kotlin 2.0+ / JDK 17+ | Core Android SDK |
+| **Linux (Desktop / Edge)** | BlueZ 5.50+ / Kernel 5.4+ | Kotlin 2.0+ / JDK 17+ | BlueZ D-Bus system bus |
 | **Apple (iOS / iPadOS)** | iOS 14.0+ | Swift 5.9+ / Xcode 15+ | Zero external SPM dependencies |
 | **Apple (macOS)** | macOS 12.0+ | Swift 5.9+ / Xcode 15+ | Zero external SPM dependencies |
 | **Apple (watchOS)** | watchOS 7.0+ | Swift 5.9+ / Xcode 15+ | Zero external SPM dependencies |
@@ -62,6 +63,14 @@ In your app's `Info.plist`, include a description explaining why your app uses B
 ```xml
 <key>NSBluetoothAlwaysUsageDescription</key>
 <string>AirDB uses Bluetooth to discover nearby devices and synchronize offline database records.</string>
+```
+
+### Linux Desktop
+Ensure the BlueZ system daemon is active and user permissions allow access to the system D-Bus:
+```bash
+sudo systemctl status bluetooth
+# Ensure the user belongs to the 'bluetooth' group if applicable
+sudo usermod -aG bluetooth $USER
 ```
 
 ---

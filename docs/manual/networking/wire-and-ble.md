@@ -97,3 +97,28 @@ In AirDB, devices do not act solely as clients or servers. Every device operates
 - **GATT Peripheral**: Broadcasts its presence using a compact 31-byte advertising frame containing AirDB's 128-bit Service UUID.
 
 This symmetric discovery ensures that any two phones approaching each other in the field can immediately establish a connection without requiring manual pairing or designated master nodes.
+
+---
+
+## 6. Linux Desktop & Edge Driver (`LinuxBleTransport`)
+
+AirDB provides a production dual-role Bluetooth Low Energy driver for Linux desktop and edge gateways running BlueZ over D-Bus:
+
+### Dual-Role D-Bus Architecture
+- **GATT Central (Scanner/Client)**: Powered by `blessed-bluez`, scanning for the 128-bit AirDB Service UUID (`41697244-4200-0000-8000-00805f9b34fb`) and initiating GATT connections.
+- **GATT Peripheral (Advertiser/Server)**: Registers a custom D-Bus GATT application at `/io/airdb` using `org.bluez.GattManager1` and broadcasts LE advertisements via `org.bluez.LEAdvertisingManager1`.
+- **Dynamic WriteType Negotiation**: Inspects peer characteristic capabilities and automatically selects `WITHOUT_RESPONSE` for fast mobile mesh throughput, falling back to `WITH_RESPONSE` when required.
+- **Security & Pairing Agent**: Automatically resolves Bluetooth security pairing challenges via an integrated D-Bus pairing agent (`onPinRequest`), preventing connection drops from passkey parsing failures.
+- **Single-Flight GATT Ordering**: Serializes physical writes through `GattOperationQueue` to eliminate link collisions.
+
+### Multiplatform Factory (`BleTransportFactory`)
+To initialize the appropriate transport driver at runtime without platform-specific compile-time leaks, use `BleTransportFactory`:
+
+```kotlin
+val transport = BleTransportFactory.create(nodeName = "laptop-node")
+```
+
+On Android, pass the `Context` object:
+```kotlin
+val transport = BleTransportFactory.create(nodeName = "mobile-node", androidContext = context)
+```

@@ -50,9 +50,13 @@ This page provides a comprehensive summary of all capabilities built into AirDB.
 ## 4. Bluetooth Networking & Framing
 
 - **Dual-Role BLE Concurrency**:
-  - Devices simultaneously operate as a GATT Central (scanning for peers) and a GATT Peripheral (advertising presence).
+  - Devices simultaneously operate as a GATT Central (scanning for peers) and a GATT Peripheral (advertising presence) across Android, Linux desktop, and Apple platforms.
+- **Linux BlueZ D-Bus Dual-Role Mesh Driver**:
+  - Full native Central and Peripheral driver communicating over system D-Bus with BlueZ GATT application manager (`org.bluez.GattManager1`) and advertising manager (`org.bluez.LEAdvertisingManager1`).
+  - Automatic `writeType` negotiation detecting `WITHOUT_RESPONSE` for high-throughput mobile interop.
+  - Dynamic pairing passkey agent (`onPinRequest`) preventing D-Bus exceptions during Bluetooth LE security negotiations.
 - **Single-Flight GATT Queue (`GattOperationQueue`)**:
-  - Enforces strict one-at-a-time operation dispatching per link on Android.
+  - Enforces strict one-at-a-time operation dispatching per link on Android and Linux.
   - Eliminates native Fluoride/BlueDroid driver packet drops and race conditions.
 - **Swift Actor Concurrency**:
   - On Apple platforms, `AirDbKit` runs the core engine inside a Swift `actor` for compile-time thread safety and non-blocking CoreBluetooth callbacks.
@@ -71,5 +75,6 @@ This page provides a comprehensive summary of all capabilities built into AirDB.
   - Simulate multi-node mesh networks with variable packet drop rates and delays directly in JVM unit tests in milliseconds.
 - **Zero Third-Party Dependencies on Apple**:
   - `AirDbKit` relies exclusively on Apple standard frameworks (`CryptoKit`, `CoreBluetooth`, `Compression`, and native `libsqlite3`).
-- **Interactive CLI Demo**:
+- **Interactive CLI Demo & Linux Node Runner**:
   - Includes a runnable multi-node disaster relief simulation (`:airdb-samples:airdb-sim-demo`) demonstrating real-time offline edits, peer discovery, and convergence.
+  - Interactive desktop node runner (`:airdb-samples:airdb-cli`) providing real-time BLE mesh observability (`peers`, `links`, `radio`, `status`, `log`) and database operations on physical Linux hardware.
