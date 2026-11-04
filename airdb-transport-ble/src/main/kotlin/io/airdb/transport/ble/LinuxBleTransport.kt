@@ -190,7 +190,10 @@ class LinuxBleTransport(
             log("peer discovered: $address rssi=${scanResult.rssi}dBm")
             listener?.onTransportEvent(TransportEvent.PeerDiscovered(address, scanResult.rssi))
 
-            if (connectedPeripherals.containsKey(address) || !connectingAddresses.add(address)) {
+            if (connectedPeripherals.containsKey(address) ||
+                connectedServerCentrals.contains(address) ||
+                !connectingAddresses.add(address)
+            ) {
                 return
             }
 
@@ -313,7 +316,9 @@ class LinuxBleTransport(
                 onCharacteristicWrite = { data, devicePath ->
                     val peerAddress = parseMacFromDevicePath(devicePath)
                     val linkId = "server-$peerAddress"
-                    if (connectedServerCentrals.add(peerAddress)) {
+                    if (connectedPeripherals.containsKey(peerAddress) || connectingAddresses.contains(peerAddress)) {
+                        log("ignoring redundant server link from $peerAddress (client link active)")
+                    } else if (connectedServerCentrals.add(peerAddress)) {
                         log("server link up: $peerAddress ($linkId)")
                         listener?.onTransportEvent(TransportEvent.LinkConnected(peerAddress, linkId))
                     }
@@ -356,6 +361,12 @@ class LinuxBleTransport(
                 activeAdapterPath,
                 LEAdvertisingManager1::class.java
             )
+
+            // Preemptively clear any stale advertisement leftover from previously killed process
+            runCatching {
+                advManager.UnregisterAdvertisement(DBusPath(advertisementPath))
+                conn.unExportObject(advertisementPath)
+            }
 
             val advertisement = BluezLeAdvertisement(
                 serviceUuid = config.serviceUuid.toString(),

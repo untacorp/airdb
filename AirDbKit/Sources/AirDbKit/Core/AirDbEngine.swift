@@ -31,6 +31,7 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
     private let lock = NSLock()
     private var sessions: [String: SyncSession] = [:]
     private var sessionTasks: [String: Task<Void, Never>] = [:]
+    private var peerLinks: [String: String] = [:]
     private var syncListeners: [@Sendable (String, Int) -> Void] = []
     private var isStarted: Bool = false
 
@@ -91,6 +92,7 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
         let activeTasks = Array(sessionTasks.values)
         sessions.removeAll()
         sessionTasks.removeAll()
+        peerLinks.removeAll()
         lock.unlock()
 
         for task in activeTasks {
@@ -191,6 +193,27 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
     public func onTransportEvent(_ event: TransportEvent) {
         switch event {
         case .linkConnected(let peerId, let linkId):
+            var oldSession: SyncSession?
+            var oldTask: Task<Void, Never>?
+            let shouldStart = lock.withScopedLock { () -> Bool in
+                if let existing = sessions[peerId], let activeLink = peerLinks[peerId] {
+                    // Duplicate connection detected: upgrade to central-initiated link if applicable
+                    if linkId.hasPrefix("central-") && activeLink.hasPrefix("peripheral-") {
+                        oldSession = existing
+                        oldTask = sessionTasks.removeValue(forKey: peerId)
+                    } else {
+                        return false
+                    }
+                }
+                peerLinks[peerId] = linkId
+                return true
+            }
+
+            oldTask?.cancel()
+            oldSession?.stop()
+
+            guard shouldStart else { return }
+
             let session = createSession(peerId: peerId, linkId: linkId)
             let task = Task<Void, Never> { [weak session] in
                 await session?.start()
@@ -200,9 +223,13 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
                 sessionTasks[peerId] = task
             }
 
-        case .linkDisconnected(let peerId, _):
-            let (session, task) = lock.withScopedLock {
-                (sessions.removeValue(forKey: peerId), sessionTasks.removeValue(forKey: peerId))
+        case .linkDisconnected(let peerId, let linkId):
+            let (session, task) = lock.withScopedLock { () -> (SyncSession?, Task<Void, Never>?) in
+                if let activeLink = peerLinks[peerId], activeLink != linkId {
+                    return (nil, nil)
+                }
+                peerLinks.removeValue(forKey: peerId)
+                return (sessions.removeValue(forKey: peerId), sessionTasks.removeValue(forKey: peerId))
             }
             task?.cancel()
             session?.stop()

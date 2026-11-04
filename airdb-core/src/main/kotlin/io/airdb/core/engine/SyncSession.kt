@@ -30,6 +30,8 @@ import io.airdb.core.model.sign
 import io.airdb.core.model.verifySignature
 import io.airdb.crypto.Ed25519KeyPair
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -65,17 +67,30 @@ class SyncSession(
     private val isSyncing = AtomicBoolean(false)
     @Volatile private var lastSentBatch: List<ChangeRecord>? = null
 
+    private val sessionJob = SupervisorJob(scope.coroutineContext[Job])
+    private val sessionScope = CoroutineScope(scope.coroutineContext + sessionJob)
+
     fun start() {
         if (!isSyncing.compareAndSet(false, true)) return
         currentState = State.HANDSHAKING
         sendHandshake()
     }
 
+    fun stop() {
+        if (!isSyncing.compareAndSet(true, false)) {
+            sessionJob.cancel()
+            return
+        }
+        currentState = State.IDLE
+        lastSentBatch = null
+        sessionJob.cancel()
+    }
+
     /**
      * Triggered when a new local mutation is committed while peers are connected.
      */
     fun notifyLocalMutation() {
-        scope.launch {
+        sessionScope.launch {
             if (currentState == State.SYNCHRONIZED || currentState == State.IDLE) {
                 streamDeltasToPeer()
             }
@@ -83,7 +98,7 @@ class SyncSession(
     }
 
     private fun sendHandshake() {
-        scope.launch {
+        sessionScope.launch {
             val packet = AirDbPacket(
                 type = PacketType.HANDSHAKE,
                 senderId = localNodeId,
@@ -96,7 +111,7 @@ class SyncSession(
     fun handlePacket(packet: AirDbPacket) {
         when (packet.type) {
             PacketType.HANDSHAKE -> {
-                scope.launch {
+                sessionScope.launch {
                     val ack = AirDbPacket(
                         type = PacketType.HANDSHAKE_ACK,
                         senderId = localNodeId,
@@ -115,7 +130,7 @@ class SyncSession(
                 val remoteClock = VectorClock.fromBinary(packet.payload)
                 peerVectorClock.merge(remoteClock)
 
-                scope.launch {
+                sessionScope.launch {
                     val resp = AirDbPacket(
                         type = PacketType.RECONCILE_RESP,
                         senderId = localNodeId,
@@ -129,7 +144,7 @@ class SyncSession(
             PacketType.RECONCILE_RESP -> {
                 val remoteClock = VectorClock.fromBinary(packet.payload)
                 peerVectorClock.merge(remoteClock)
-                scope.launch {
+                sessionScope.launch {
                     streamDeltasToPeer()
                 }
             }
@@ -146,7 +161,7 @@ class SyncSession(
                         peerVectorClock.update(origin, change.hlcTimestamp)
                     }
                     lastSentBatch = null
-                    scope.launch { streamDeltasToPeer() }
+                    sessionScope.launch { streamDeltasToPeer() }
                 }
             }
 
@@ -155,7 +170,7 @@ class SyncSession(
     }
 
     private fun handleDeltaBatch(packet: AirDbPacket) {
-        scope.launch {
+        sessionScope.launch {
             val raw = DeltaBatch.deserialize(packet.payload)
             if (enforceSignatures && raw.any { !it.verifySignature() }) {
                 // Reject invalid or unverified signature batches without acknowledging
@@ -186,7 +201,7 @@ class SyncSession(
 
     private fun startReconciliation() {
         currentState = State.RECONCILING
-        scope.launch {
+        sessionScope.launch {
             val req = AirDbPacket(
                 type = PacketType.RECONCILE_REQ,
                 senderId = localNodeId,

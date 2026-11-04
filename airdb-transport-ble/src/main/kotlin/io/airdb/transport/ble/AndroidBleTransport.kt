@@ -371,13 +371,15 @@ class AndroidBleTransport(
             if (descriptor.uuid == config.cccdUuid) {
                 val address = device.address
                 val linkId = "server-$address"
-                subscribedCentrals[address] = device
+                val isNew = subscribedCentrals.putIfAbsent(address, device) == null
 
                 if (responseNeeded) {
                     gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
                 }
 
-                listener?.onTransportEvent(TransportEvent.LinkConnected(address, linkId))
+                if (isNew && !activeGattClients.containsKey(address)) {
+                    listener?.onTransportEvent(TransportEvent.LinkConnected(address, linkId))
+                }
             } else if (responseNeeded) {
                 gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
             }

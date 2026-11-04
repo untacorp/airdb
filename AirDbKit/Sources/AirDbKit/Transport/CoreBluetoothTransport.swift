@@ -301,9 +301,12 @@ extension CoreBluetoothTransport: CBCentralManagerDelegate, CBPeripheralDelegate
         discoveredPeripherals[peripheral.identifier] = peripheral
         lock.lock()
         listener?.onTransportEvent(.peerDiscovered(peerId: peripheral.identifier.uuidString, rssi: RSSI.intValue))
+        let alreadyConnected = activePeripherals[peripheral.identifier] != nil || subscribedCentrals[peripheral.identifier] != nil
         lock.unlock()
 
-        central.connect(peripheral, options: nil)
+        if !alreadyConnected {
+            central.connect(peripheral, options: nil)
+        }
     }
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
@@ -392,7 +395,10 @@ extension CoreBluetoothTransport: CBPeripheralManagerDelegate {
         let linkId = "peripheral-\(peerId)"
 
         lock.lock()
-        listener?.onTransportEvent(.linkConnected(peerId: peerId, linkId: linkId))
+        let alreadyClient = activePeripherals[central.identifier] != nil
+        if !alreadyClient {
+            listener?.onTransportEvent(.linkConnected(peerId: peerId, linkId: linkId))
+        }
         lock.unlock()
     }
 

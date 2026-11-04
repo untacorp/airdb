@@ -115,6 +115,14 @@ fun main(args: Array<String>) = runBlocking {
         return@runBlocking
     }
 
+    val shutdownHook = Thread({
+        runBlocking {
+            runCatching { engine.stop() }
+            runCatching { db.close() }
+        }
+    }, "airdb-cli-shutdown")
+    Runtime.getRuntime().addShutdownHook(shutdownHook)
+
     println("airdb 0.2.2 (node: $nodeName, db: ${dbFile.name})")
     println("type 'help' for commands.")
     printPrompt()
@@ -275,6 +283,7 @@ fun main(args: Array<String>) = runBlocking {
         printPrompt()
     }
 
+    runCatching { Runtime.getRuntime().removeShutdownHook(shutdownHook) }
     engine.stop()
     db.close()
     println("node stopped.")

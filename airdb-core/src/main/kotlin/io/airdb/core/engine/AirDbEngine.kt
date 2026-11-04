@@ -55,6 +55,7 @@ class AirDbEngine(
     val vectorClock = io.airdb.core.clock.VectorClock()
 
     private val sessions = ConcurrentHashMap<String, SyncSession>()
+    private val peerLinks = ConcurrentHashMap<String, String>()
     private val syncListeners = CopyOnWriteArrayList<(peerId: String, changeCount: Int) -> Unit>()
     private var isStarted = false
 
@@ -80,8 +81,10 @@ class AirDbEngine(
     fun stop() {
         if (!isStarted) return
         isStarted = false
-        transport.stop()
+        sessions.values.forEach { it.stop() }
         sessions.clear()
+        peerLinks.clear()
+        transport.stop()
         scope.coroutineContext.cancelChildren()
     }
 
@@ -124,6 +127,16 @@ class AirDbEngine(
         syncListeners.add(listener)
     }
 
+    /**
+     * Returns the active link identifier for [peerId], or null if not connected.
+     */
+    fun getActiveLinkId(peerId: String): String? = peerLinks[peerId]
+
+    /**
+     * Returns the active sync session for [peerId], or null if not connected.
+     */
+    fun getSession(peerId: String): SyncSession? = sessions[peerId]
+
     private fun createSession(peerId: String, linkId: String): SyncSession {
         return SyncSession(
             peerId = peerId,
@@ -146,17 +159,38 @@ class AirDbEngine(
     override fun onTransportEvent(event: TransportEvent) {
         when (event) {
             is TransportEvent.LinkConnected -> {
+                val existingSession = sessions[event.peerId]
+                if (existingSession != null) {
+                    // Duplicate connection detected for this peer.
+                    // If existing link is server-initiated and new link is client-initiated, upgrade cleanly.
+                    if (event.linkId.startsWith("client-") && existingSession.linkId.startsWith("server-")) {
+                        existingSession.stop()
+                        val session = createSession(event.peerId, event.linkId)
+                        sessions[event.peerId] = session
+                        peerLinks[event.peerId] = event.linkId
+                        session.start()
+                    }
+                    // Otherwise preserve existing authoritative link and drop duplicate
+                    return
+                }
                 val session = createSession(event.peerId, event.linkId)
                 sessions[event.peerId] = session
+                peerLinks[event.peerId] = event.linkId
                 session.start()
             }
 
             is TransportEvent.LinkDisconnected -> {
-                sessions.remove(event.peerId)
+                val activeLinkId = peerLinks[event.peerId]
+                if (activeLinkId == null || activeLinkId == event.linkId) {
+                    peerLinks.remove(event.peerId)
+                    val session = sessions.remove(event.peerId)
+                    session?.stop()
+                }
             }
 
             is TransportEvent.PacketReceived -> {
                 val session = sessions.computeIfAbsent(event.peerId) {
+                    peerLinks[event.peerId] = event.linkId
                     createSession(event.peerId, event.linkId)
                 }
                 session.handlePacket(event.packet)

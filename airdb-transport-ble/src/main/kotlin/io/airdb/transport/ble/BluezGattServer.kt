@@ -87,15 +87,23 @@ internal class BluezGattServer(
             this.gattChar = characteristic
             this.objectManager = objManager
 
-            conn.exportObject(appPath, objManager)
-            conn.exportObject(servicePath, service)
-            conn.exportObject(charPath, characteristic)
-
             val gattManager = conn.getRemoteObject(
                 "org.bluez",
                 adapterPath,
                 GattManager1::class.java
             )
+
+            // Preemptively clear any stale GATT application leftover from previously killed process
+            runCatching {
+                gattManager.UnregisterApplication(DBusPath(appPath))
+                conn.unExportObject(charPath)
+                conn.unExportObject(servicePath)
+                conn.unExportObject(appPath)
+            }
+
+            conn.exportObject(appPath, objManager)
+            conn.exportObject(servicePath, service)
+            conn.exportObject(charPath, characteristic)
 
             gattManager.RegisterApplication(DBusPath(appPath), emptyMap())
             log("gatt app registered at $appPath")
