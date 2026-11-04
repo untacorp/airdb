@@ -31,7 +31,7 @@
 
 ## Key Capabilities
 
-- **Dual-Role BLE Concurrency**: Every device operates simultaneously as both a GATT Central (scanner) and GATT Peripheral (advertiser).
+- **Dual-Role BLE Concurrency**: Every device operates simultaneously as both a GATT Central (scanner/client) and GATT Peripheral (advertiser/server) across Android, Apple (iOS/macOS), and Linux desktop (BlueZ D-Bus).
 - **Sans-I/O Layered Design**: Core causality logic, vector clocks, and wire codecs are 100% pure Kotlin and pure Swift standard libraries with zero socket or platform framework leaks.
 - **Monotonic Hybrid Logical Clocks (HLC)**: Provides deterministic distributed causality and Last-Write-Wins (LWW) resolution without network time synchronization.
 - **Zero-Trust Cryptographic Mesh**:
@@ -87,7 +87,7 @@
 | +----------+--------------------+   +------------+--------------+ |
 | | airdb-transport-ble           |   | airdb-transport-sim       | |
 | | CoreBluetoothTransport        |   | SimulatedTransport        | |
-| | (Android & Apple BLE Drivers) |   | (Sans-I/O In-Memory       | |
+| | (Android, Linux & Apple BLE)  |   | (Sans-I/O In-Memory       | |
 | | - Central + Peripheral Roles  |   |  Multi-Node Mesh Lab)     | |
 | | - Single-Flight GATT Queue    |   +---------------------------+ |
 | | - Backpressure Flow Control   |                                 |
@@ -196,8 +196,8 @@ let record = try await engine.saveRecord(
 | [`airdb-core`](airdb-core/) | HLC, Vector Clock, and 4-phase synchronization state machine with signature verification. | Pure Kotlin |
 | [`airdb-transport-api`](airdb-transport-api/) | P2P transport interfaces, events, and commands. | Pure Kotlin |
 | [`airdb-transport-sim`](airdb-transport-sim/) | In-memory packet radio mesh simulator for fast automated tests. | Pure Kotlin |
-| [`airdb-transport-ble`](airdb-transport-ble/) | Production Android BLE GATT server/client and anti-race queue. | Android SDK / Kotlin |
-| [`airdb-samples`](airdb-samples/) | Runnable CLI simulation demos demonstrating multi-node sync. | Kotlin |
+| [`airdb-transport-ble`](airdb-transport-ble/) | Production BLE GATT server/client for Android and Linux BlueZ (D-Bus), with anti-race GATT queue. | Android SDK / BlueZ / Kotlin |
+| [`airdb-samples`](airdb-samples/) | Runnable CLI simulation demos and interactive desktop BLE node runner (`airdb-cli`). | Kotlin |
 | [`AirDbKit`](AirDbKit/) | Native Swift package for iOS, macOS, watchOS with CoreBluetooth, native SQLite3, and CryptoKit. | Swift 5.9+ / Apple SDK |
 
 ---
@@ -221,6 +221,14 @@ To run the interactive off-grid disaster response sync simulation:
 ```bash
 ./gradlew :airdb-samples:airdb-sim-demo:run
 ```
+
+To run an interactive desktop AirDB node on Linux over real Bluetooth Low Energy:
+
+```bash
+./gradlew :airdb-samples:airdb-cli:run --console=plain --args="laptop-node"
+```
+
+The interactive runner provides commands to manage collections (`put`, `get`, `del`, `list`, `cols`, `compact`) and inspect the BLE radio mesh (`peers`, `links`, `radio`, `status`, `log`).
 
 ---
 

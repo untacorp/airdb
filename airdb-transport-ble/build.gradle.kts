@@ -39,6 +39,9 @@ dependencies {
     implementation(libs.kotlin.stdlib)
     implementation(libs.coroutines.core)
 
+    implementation("com.github.weliem.blessed-bluez:blessed:0.64")
+    implementation("com.github.hypfvieh:dbus-java-transport-native-unixsocket:4.3.2")
+
     if (androidJarFile != null) {
         compileOnly(files(androidJarFile))
         testCompileOnly(files(androidJarFile))

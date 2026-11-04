@@ -458,6 +458,25 @@ class SqliteDbAdapter(
         return entity.type == MutationType.DELETE
     }
 
+    /**
+     * Retrieves the distinct names of all active collections stored in the database.
+     */
+    suspend fun getCollections(): List<String> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val list = mutableListOf<String>()
+            val sql = "SELECT DISTINCT collection FROM airdb_entities WHERE type != ? ORDER BY collection"
+            connection.prepareStatement(sql).use { stmt ->
+                stmt.setInt(1, MutationType.DELETE.ordinal)
+                stmt.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        list.add(rs.getString("collection"))
+                    }
+                }
+            }
+            list
+        }
+    }
+
     override fun close() {
         if (!connection.isClosed) {
             connection.close()

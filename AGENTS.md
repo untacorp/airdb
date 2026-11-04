@@ -59,7 +59,7 @@ Welcome to **AirDB**. This file outlines mandatory architectural constraints, co
 ## 3. Engineering Roadmap & Track Status
 
 - **Track 0 (Native Apple Interoperability - AirDbKit)**: COMPLETE. `AirDbKit` Swift package implemented, tested, and passing CI with 100% on-wire parity and structured concurrency.
-- **Track 1 (Production Android BLE Driver & CI/CD)**: COMPLETE. `AndroidBleTransport` implemented with `GattOperationQueue`, dynamic `android.jar` resolution, permissions helper, and GitHub Actions CI.
+- **Track 1 (Production Android & Linux BLE Drivers & CI/CD)**: COMPLETE. `AndroidBleTransport` implemented with `GattOperationQueue` and dynamic `android.jar` resolution. `LinuxBleTransport` implemented with BlueZ D-Bus dual-role Central/Peripheral GATT server and advertising. Interactive `airdb-cli` desktop node runner added. Automated CI verification passing.
 - **Track 2 (Durable Persistence Engine - SQLite WAL)**: COMPLETE. `SqliteAirDbAdapter` on JVM/Android and `SqliteDbAdapter` on Apple platforms with WAL mode, atomic transactions, and tombstone lifecycle.
 - **Track 3 (Zero-Trust Cryptographic Mesh)**: COMPLETE. RFC 8439 ChaCha20-Poly1305 AEAD, RFC 8032 Ed25519 digital signatures, RFC 5869 HKDF-SHA256, packet header AAD binding, signed delta batch format, and `enforceSignatures` session verification.
 - **Track 4 (Physical Radio Field Benchmarking & Performance Tuning)**: NEXT TARGET. Real hardware testbed across Android and Apple devices measuring RSSI attenuation, BLE 4.2 vs 5.0 PHY throughput, packet drop resilience, and battery impact.

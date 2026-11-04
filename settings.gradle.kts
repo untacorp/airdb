@@ -11,6 +11,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") }
     }
 }
 
@@ -26,3 +27,4 @@ include(":airdb-core")
 include(":airdb-transport-ble")
 include(":airdb-crypto")
 include(":airdb-samples:airdb-sim-demo")
+include(":airdb-samples:airdb-cli")
