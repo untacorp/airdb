@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -33,10 +33,10 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -1265,6 +1265,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#6-linux-desktop-edge-driver-linuxbletransport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Linux Desktop &amp; Edge Driver (LinuxBleTransport)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Linux Desktop &amp; Edge Driver (LinuxBleTransport)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dual-role-d-bus-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dual-Role D-Bus Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiplatform-factory-bletransportfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiplatform Factory (BleTransportFactory)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1956,6 +1995,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#6-linux-desktop-edge-driver-linuxbletransport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Linux Desktop &amp; Edge Driver (LinuxBleTransport)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Linux Desktop &amp; Edge Driver (LinuxBleTransport)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dual-role-d-bus-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dual-Role D-Bus Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiplatform-factory-bletransportfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiplatform Factory (BleTransportFactory)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2045,6 +2123,24 @@
 - <strong>GATT Central</strong>: Scans for advertisements from nearby peers.
 - <strong>GATT Peripheral</strong>: Broadcasts its presence using a compact 31-byte advertising frame containing AirDB's 128-bit Service UUID.</p>
 <p>This symmetric discovery ensures that any two phones approaching each other in the field can immediately establish a connection without requiring manual pairing or designated master nodes.</p>
+<hr />
+<h2 id="6-linux-desktop-edge-driver-linuxbletransport">6. Linux Desktop &amp; Edge Driver (<code>LinuxBleTransport</code>)</h2>
+<p>AirDB provides a production dual-role Bluetooth Low Energy driver for Linux desktop and edge gateways running BlueZ over D-Bus:</p>
+<h3 id="dual-role-d-bus-architecture">Dual-Role D-Bus Architecture</h3>
+<ul>
+<li><strong>GATT Central (Scanner/Client)</strong>: Powered by <code>blessed-bluez</code>, scanning for the 128-bit AirDB Service UUID (<code>41697244-4200-0000-8000-00805f9b34fb</code>) and initiating GATT connections.</li>
+<li><strong>GATT Peripheral (Advertiser/Server)</strong>: Registers a custom D-Bus GATT application at <code>/io/airdb</code> using <code>org.bluez.GattManager1</code> and broadcasts LE advertisements via <code>org.bluez.LEAdvertisingManager1</code>.</li>
+<li><strong>Dynamic WriteType Negotiation</strong>: Inspects peer characteristic capabilities and automatically selects <code>WITHOUT_RESPONSE</code> for fast mobile mesh throughput, falling back to <code>WITH_RESPONSE</code> when required.</li>
+<li><strong>Security &amp; Pairing Agent</strong>: Automatically resolves Bluetooth security pairing challenges via an integrated D-Bus pairing agent (<code>onPinRequest</code>), preventing connection drops from passkey parsing failures.</li>
+<li><strong>Single-Flight GATT Ordering</strong>: Serializes physical writes through <code>GattOperationQueue</code> to eliminate link collisions.</li>
+</ul>
+<h3 id="multiplatform-factory-bletransportfactory">Multiplatform Factory (<code>BleTransportFactory</code>)</h3>
+<p>To initialize the appropriate transport driver at runtime without platform-specific compile-time leaks, use <code>BleTransportFactory</code>:</p>
+<div class="language-kotlin highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">val</span><span class="w"> </span><span class="nv">transport</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BleTransportFactory</span><span class="p">.</span><span class="na">create</span><span class="p">(</span><span class="n">nodeName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"laptop-node"</span><span class="p">)</span>
+</span></code></pre></div>
+<p>On Android, pass the <code>Context</code> object:
+<div class="language-kotlin highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">val</span><span class="w"> </span><span class="nv">transport</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BleTransportFactory</span><span class="p">.</span><span class="na">create</span><span class="p">(</span><span class="n">nodeName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"mobile-node"</span><span class="p">,</span><span class="w"> </span><span class="n">androidContext</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">context</span><span class="p">)</span>
+</span></code></pre></div></p>
 
 
 
@@ -2102,10 +2198,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.tracking", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.tracking", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.c21346df.min.js"></script>
       
         <script src="../../../javascripts/mathjax.js"></script>
       

@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -33,10 +33,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -1648,6 +1648,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#022-2026-11-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.2.2] - 2026-11-05
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.2.2] - 2026-11-05">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#021-2026-10-22" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1660,7 +1699,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1710,7 +1749,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1738,7 +1777,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_2" class="md-nav__link">
+  <a href="#added_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1919,6 +1958,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#022-2026-11-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.2.2] - 2026-11-05
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.2.2] - 2026-11-05">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#021-2026-10-22" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1931,7 +2009,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -1981,7 +2059,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2009,7 +2087,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_2" class="md-nav__link">
+  <a href="#added_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -2049,8 +2127,29 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <hr />
-<h2 id="021-2026-10-22">[0.2.1] - 2026-10-22</h2>
+<h2 id="022-2026-11-05">[0.2.2] - 2026-11-05</h2>
 <h3 id="added">Added</h3>
+<ul>
+<li><strong>Linux Desktop BLE Dual-Role Mesh Driver (<code>airdb-transport-ble</code>)</strong>:</li>
+<li><code>LinuxBleTransport</code>: Dual-role Central (GATT client scanning via <code>blessed-bluez</code>) and Peripheral (LE advertising &amp; GATT server via BlueZ D-Bus).</li>
+<li><code>BluezGattServer</code>: Native D-Bus GATT service &amp; characteristic implementation with <code>PropertiesChanged</code> signals and custom interface omitting non-exportable <code>FileDescriptor</code> types.</li>
+<li><code>BleTransportFactory</code>: Dynamic runtime OS detection routing to Android, Linux, or Windows with explicit platform safety checks.</li>
+<li>Automatic <code>writeType</code> negotiation detecting <code>WITHOUT_RESPONSE</code> for high-throughput mobile mesh interop.</li>
+<li>Dynamic pairing passkey agent (<code>onPinRequest</code>) preventing D-Bus <code>NumberFormatException</code> during Bluetooth LE security negotiations.</li>
+<li><strong>Interactive Node CLI Runner (<code>airdb-samples/airdb-cli</code>)</strong>:</li>
+<li>Standalone terminal-based interactive node runner for Linux desktop with instantaneous prompt flushing and clean Unix-grade ergonomics.</li>
+<li>Mesh and radio observability commands: <code>peers</code> (RSSI &amp; discovery state), <code>links</code> (active GATT connections), <code>radio</code> (adapter configuration and TX/RX packet statistics), <code>status</code> (HLC and Vector Clock), and <code>log [on|off]</code> (live driver tracing).</li>
+<li>Schemaless CRUD and compaction commands: <code>put</code>, <code>get</code>, <code>del</code> (tombstone generation), <code>list</code>, <code>cols</code>, and <code>compact</code>.</li>
+<li><strong>Persistence Enhancements (<code>airdb-adapter-sqlite</code>)</strong>:</li>
+<li>Added <code>getCollections(): List&lt;String&gt;</code> method to query distinct active collection namespaces.</li>
+</ul>
+<h3 id="changed">Changed</h3>
+<ul>
+<li>Refactored <code>LinuxBleTransport</code> under kernel-filter discipline, silencing unrequested stdout logging by default and streamlining link lifecycle transitions.</li>
+</ul>
+<hr />
+<h2 id="021-2026-10-22">[0.2.1] - 2026-10-22</h2>
+<h3 id="added_1">Added</h3>
 <ul>
 <li><strong>AeroLog Native Storage Engine (<code>airdb-adapter-aerolog</code>)</strong>:</li>
 <li>High-throughput Append-Only Bitcask persistence adapter wrapping pure-Rust AeroLog via Mozilla UniFFI.</li>
@@ -2092,7 +2191,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <hr />
 <h2 id="020-2026-10-21">[0.2.0] - 2026-10-21</h2>
-<h3 id="added_1">Added</h3>
+<h3 id="added_2">Added</h3>
 <ul>
 <li><strong>Zero-Trust Cryptographic Mesh (<code>airdb-crypto</code> &amp; <code>AirDbKit/Crypto</code>)</strong>:</li>
 <li>RFC 8439 ChaCha20-Poly1305 AEAD symmetric cipher using Java 17 JCA on Android/JVM and Apple <code>CryptoKit</code> on Apple platforms.</li>
@@ -2118,7 +2217,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <hr />
 <h2 id="010-2026-10-20">[0.1.0] - 2026-10-20</h2>
-<h3 id="added_2">Added</h3>
+<h3 id="added_3">Added</h3>
 <ul>
 <li><strong>Core Engine (<code>airdb-core</code>)</strong>:</li>
 <li>Monotonic Hybrid Logical Clock (<code>HybridLogicalClock</code>, <code>HlcTimestamp</code>) with deterministic tie-breaking.</li>
@@ -2199,10 +2298,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.tracking", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.tracking", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
         <script src="../../javascripts/mathjax.js"></script>
       

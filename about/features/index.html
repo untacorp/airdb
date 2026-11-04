@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -33,10 +33,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -1988,9 +1988,13 @@
 <h2 id="4-bluetooth-networking-framing">4. Bluetooth Networking &amp; Framing</h2>
 <ul>
 <li><strong>Dual-Role BLE Concurrency</strong>:</li>
-<li>Devices simultaneously operate as a GATT Central (scanning for peers) and a GATT Peripheral (advertising presence).</li>
+<li>Devices simultaneously operate as a GATT Central (scanning for peers) and a GATT Peripheral (advertising presence) across Android, Linux desktop, and Apple platforms.</li>
+<li><strong>Linux BlueZ D-Bus Dual-Role Mesh Driver</strong>:</li>
+<li>Full native Central and Peripheral driver communicating over system D-Bus with BlueZ GATT application manager (<code>org.bluez.GattManager1</code>) and advertising manager (<code>org.bluez.LEAdvertisingManager1</code>).</li>
+<li>Automatic <code>writeType</code> negotiation detecting <code>WITHOUT_RESPONSE</code> for high-throughput mobile interop.</li>
+<li>Dynamic pairing passkey agent (<code>onPinRequest</code>) preventing D-Bus exceptions during Bluetooth LE security negotiations.</li>
 <li><strong>Single-Flight GATT Queue (<code>GattOperationQueue</code>)</strong>:</li>
-<li>Enforces strict one-at-a-time operation dispatching per link on Android.</li>
+<li>Enforces strict one-at-a-time operation dispatching per link on Android and Linux.</li>
 <li>Eliminates native Fluoride/BlueDroid driver packet drops and race conditions.</li>
 <li><strong>Swift Actor Concurrency</strong>:</li>
 <li>On Apple platforms, <code>AirDbKit</code> runs the core engine inside a Swift <code>actor</code> for compile-time thread safety and non-blocking CoreBluetooth callbacks.</li>
@@ -2008,8 +2012,9 @@
 <li>Simulate multi-node mesh networks with variable packet drop rates and delays directly in JVM unit tests in milliseconds.</li>
 <li><strong>Zero Third-Party Dependencies on Apple</strong>:</li>
 <li><code>AirDbKit</code> relies exclusively on Apple standard frameworks (<code>CryptoKit</code>, <code>CoreBluetooth</code>, <code>Compression</code>, and native <code>libsqlite3</code>).</li>
-<li><strong>Interactive CLI Demo</strong>:</li>
+<li><strong>Interactive CLI Demo &amp; Linux Node Runner</strong>:</li>
 <li>Includes a runnable multi-node disaster relief simulation (<code>:airdb-samples:airdb-sim-demo</code>) demonstrating real-time offline edits, peer discovery, and convergence.</li>
+<li>Interactive desktop node runner (<code>:airdb-samples:airdb-cli</code>) providing real-time BLE mesh observability (<code>peers</code>, <code>links</code>, <code>radio</code>, <code>status</code>, <code>log</code>) and database operations on physical Linux hardware.</li>
 </ul>
 
 
@@ -2068,10 +2073,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.tracking", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.tracking", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
         <script src="../../javascripts/mathjax.js"></script>
       

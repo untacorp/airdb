@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -33,10 +33,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -527,6 +527,17 @@
     <span class="md-ellipsis">
       
         Apple (iOS / macOS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linux-desktop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linux Desktop
       
     </span>
   </a>
@@ -2040,6 +2051,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#linux-desktop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linux Desktop
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2118,6 +2140,12 @@
 <td>Core Android SDK</td>
 </tr>
 <tr>
+<td><strong>Linux (Desktop / Edge)</strong></td>
+<td>BlueZ 5.50+ / Kernel 5.4+</td>
+<td>Kotlin 2.0+ / JDK 17+</td>
+<td>BlueZ D-Bus system bus</td>
+</tr>
+<tr>
 <td><strong>Apple (iOS / iPadOS)</strong></td>
 <td>iOS 14.0+</td>
 <td>Swift 5.9+ / Xcode 15+</td>
@@ -2156,6 +2184,12 @@
 <p>In your app's <code>Info.plist</code>, include a description explaining why your app uses Bluetooth:
 <div class="language-xml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">&lt;key&gt;</span>NSBluetoothAlwaysUsageDescription<span class="nt">&lt;/key&gt;</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">&lt;string&gt;</span>AirDB<span class="w"> </span>uses<span class="w"> </span>Bluetooth<span class="w"> </span>to<span class="w"> </span>discover<span class="w"> </span>nearby<span class="w"> </span>devices<span class="w"> </span>and<span class="w"> </span>synchronize<span class="w"> </span>offline<span class="w"> </span>database<span class="w"> </span>records.<span class="nt">&lt;/string&gt;</span>
+</span></code></pre></div></p>
+<h3 id="linux-desktop">Linux Desktop</h3>
+<p>Ensure the BlueZ system daemon is active and user permissions allow access to the system D-Bus:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>status<span class="w"> </span>bluetooth
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># Ensure the user belongs to the 'bluetooth' group if applicable</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>bluetooth<span class="w"> </span><span class="nv">$USER</span>
 </span></code></pre></div></p>
 <hr />
 <h2 id="where-to-get-help">Where to Get Help</h2>
@@ -2220,10 +2254,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.tracking", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.tracking", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
         <script src="../../javascripts/mathjax.js"></script>
       
