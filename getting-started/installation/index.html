@@ -2220,22 +2220,22 @@
 <p>In your app module's <code>build.gradle.kts</code>, declare the required AirDB modules under the verified namespace <code>io.github.untacorp</code>:</p>
 <div class="language-kotlin highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">dependencies</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="c1">// Core synchronization engine and Hybrid Logical Clock</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-core:0.2.2"</span><span class="p">)</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-core:0.2.3"</span><span class="p">)</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="c1">// Zero-Trust cryptographic mesh (ChaCha20-Poly1305, Ed25519, HKDF)</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-crypto:0.2.2"</span><span class="p">)</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-crypto:0.2.3"</span><span class="p">)</span>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="c1">// Turnkey SQLite storage engine with Write-Ahead Logging (WAL)</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-adapter-sqlite:0.2.2"</span><span class="p">)</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-adapter-sqlite:0.2.3"</span><span class="p">)</span>
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="c1">// Android &amp; Linux Bluetooth Low Energy hardware transport driver</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-transport-ble:0.2.2"</span><span class="p">)</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-transport-ble:0.2.3"</span><span class="p">)</span>
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
 </span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="c1">// (Optional) Wire protocol codec (pulled transitively by core)</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-protocol:0.2.2"</span><span class="p">)</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-protocol:0.2.3"</span><span class="p">)</span>
 </span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>
 </span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="c1">// (Optional) In-memory network simulator for automated unit tests</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="n">testImplementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-transport-sim:0.2.2"</span><span class="p">)</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="n">testImplementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-transport-sim:0.2.3"</span><span class="p">)</span>
 </span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="p">}</span>
 </span></code></pre></div>
 </div>
@@ -2261,10 +2261,10 @@
 <h3 id="step-2-declare-dependencies">Step 2: Declare Dependencies</h3>
 <p>Add dependencies in <code>build.gradle.kts</code> using the same coordinates:</p>
 <div class="language-kotlin highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">dependencies</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-core:0.2.2"</span><span class="p">)</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-crypto:0.2.2"</span><span class="p">)</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-adapter-sqlite:0.2.2"</span><span class="p">)</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-transport-ble:0.2.2"</span><span class="p">)</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-core:0.2.3"</span><span class="p">)</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-crypto:0.2.3"</span><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-adapter-sqlite:0.2.3"</span><span class="p">)</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="n">implementation</span><span class="p">(</span><span class="s">"io.github.untacorp:airdb-transport-ble:0.2.3"</span><span class="p">)</span>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">}</span>
 </span></code></pre></div>
 </div>
@@ -2277,7 +2277,7 @@
 <li>In the search field (top right), enter the repository URL:
    <div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>https://github.com/untacorp/airdb.git
 </span></code></pre></div></li>
-<li>Set the <strong>Dependency Rule</strong> to <strong>Up to Next Major from <code>0.2.2</code></strong> (or <strong>Exact <code>0.2.2</code></strong>).</li>
+<li>Set the <strong>Dependency Rule</strong> to <strong>Up to Next Major from <code>0.2.3</code></strong> (or <strong>Exact <code>0.2.3</code></strong>).</li>
 <li>Choose your app target for <code>AirDbKit</code> and click <strong>Add Package</strong>.</li>
 </ol>
 <h3 id="option-b-using-packageswift">Option B: Using <code>Package.swift</code></h3>
@@ -2292,7 +2292,7 @@
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">        </span><span class="p">.</span><span class="n">macOS</span><span class="p">(.</span><span class="n">v12</span><span class="p">)</span>
 </span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="p">],</span>
 </span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="n">dependencies</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">        </span><span class="p">.</span><span class="n">package</span><span class="p">(</span><span class="n">url</span><span class="p">:</span><span class="w"> </span><span class="s">"https://github.com/untacorp/airdb.git"</span><span class="p">,</span><span class="w"> </span><span class="n">from</span><span class="p">:</span><span class="w"> </span><span class="s">"0.2.2"</span><span class="p">)</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">        </span><span class="p">.</span><span class="n">package</span><span class="p">(</span><span class="n">url</span><span class="p">:</span><span class="w"> </span><span class="s">"https://github.com/untacorp/airdb.git"</span><span class="p">,</span><span class="w"> </span><span class="n">from</span><span class="p">:</span><span class="w"> </span><span class="s">"0.2.3"</span><span class="p">)</span>
 </span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">    </span><span class="p">],</span>
 </span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">    </span><span class="n">targets</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 </span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">        </span><span class="p">.</span><span class="n">target</span><span class="p">(</span>
@@ -2411,7 +2411,7 @@ On Android 12 and above, <code>BLUETOOTH_SCAN</code>, <code>BLUETOOTH_ADVERTISE<
 - <strong>Keyserver Verification</strong>: <code>keyserver.ubuntu.com</code> and <code>keys.openpgp.org</code></p>
 <p>To verify detached signatures locally:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>gpg<span class="w"> </span>--keyserver<span class="w"> </span>keyserver.ubuntu.com<span class="w"> </span>--recv-keys<span class="w"> </span>CEB164B84F724DCC
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>gpg<span class="w"> </span>--verify<span class="w"> </span>airdb-core-0.2.2.jar.asc<span class="w"> </span>airdb-core-0.2.2.jar
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>gpg<span class="w"> </span>--verify<span class="w"> </span>airdb-core-0.2.3.jar.asc<span class="w"> </span>airdb-core-0.2.3.jar
 </span></code></pre></div></p>
 <hr />
 <h2 id="next-steps">Next Steps</h2>
