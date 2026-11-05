@@ -67,15 +67,11 @@ fun main(args: Array<String>) = runBlocking {
                 override fun onTransportEvent(event: TransportEvent) {
                     when (event) {
                         is TransportEvent.PeerDiscovered -> {
-                            peers.compute(event.peerId) { addr, existing ->
-                                if (existing != null) {
-                                    existing.rssi = event.rssi
-                                    existing.lastSeenMs = System.currentTimeMillis()
-                                    existing
-                                } else {
-                                    PeerEntry(addr, event.rssi, System.currentTimeMillis())
-                                }
+                            val entry = peers.getOrPut(event.peerId) {
+                                PeerEntry(event.peerId, event.rssi, System.currentTimeMillis())
                             }
+                            entry.rssi = event.rssi
+                            entry.lastSeenMs = System.currentTimeMillis()
                         }
                         is TransportEvent.LinkConnected -> {
                             links[event.linkId] = LinkEntry(

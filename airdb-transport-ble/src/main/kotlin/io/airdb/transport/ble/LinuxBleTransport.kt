@@ -362,7 +362,6 @@ class LinuxBleTransport(
                 LEAdvertisingManager1::class.java
             )
 
-            // Preemptively clear any stale advertisement leftover from previously killed process
             runCatching {
                 advManager.UnregisterAdvertisement(DBusPath(advertisementPath))
                 conn.unExportObject(advertisementPath)
@@ -413,36 +412,27 @@ class LinuxBleTransport(
                 BinaryCodec.encode(fragment, clusterKey = key)
             }
 
-            // 1. Dispatch to outbound Central client connections
-            connectedPeripherals.forEach { (address, peripheral) ->
-                if (targetPeerId == null || targetPeerId == address) {
-                    val linkId = "client-$address"
-                    val char = peripheral.getCharacteristic(config.serviceUuid, config.characteristicUuid)
-                    val writeType = if (char != null && char.supportsWriteType(BluetoothGattCharacteristic.WriteType.WITHOUT_RESPONSE)) {
-                        BluetoothGattCharacteristic.WriteType.WITHOUT_RESPONSE
-                    } else {
-                        BluetoothGattCharacteristic.WriteType.WITH_RESPONSE
-                    }
-                    val enqueued = queue.enqueue(linkId, encoded, isNotification = false) {
-                        peripheral.writeCharacteristic(
-                            config.serviceUuid,
-                            config.characteristicUuid,
-                            encoded,
-                            writeType
-                        )
-                    }
-                    if (enqueued) anyDispatched = true
+            for ((address, peripheral) in connectedPeripherals) {
+                if (targetPeerId != null && targetPeerId != address) continue
+                val linkId = "client-$address"
+                val char = peripheral.getCharacteristic(config.serviceUuid, config.characteristicUuid)
+                val writeType = if (char != null && char.supportsWriteType(BluetoothGattCharacteristic.WriteType.WITHOUT_RESPONSE)) {
+                    BluetoothGattCharacteristic.WriteType.WITHOUT_RESPONSE
+                } else {
+                    BluetoothGattCharacteristic.WriteType.WITH_RESPONSE
                 }
+                val enqueued = queue.enqueue(linkId, encoded, isNotification = false) {
+                    peripheral.writeCharacteristic(config.serviceUuid, config.characteristicUuid, encoded, writeType)
+                }
+                if (enqueued) anyDispatched = true
             }
 
-            // 2. Dispatch to subscribed Centrals via GATT Server notifications
             val server = gattServer
-            if (server != null && server.isNotifying.get()) {
-                if (targetPeerId == null || connectedServerCentrals.contains(targetPeerId)) {
-                    if (server.notify(encoded)) {
-                        anyDispatched = true
-                    }
-                }
+            if (server != null && server.isNotifying.get() &&
+                (targetPeerId == null || targetPeerId in connectedServerCentrals) &&
+                server.notify(encoded)
+            ) {
+                anyDispatched = true
             }
         }
 

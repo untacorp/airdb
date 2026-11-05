@@ -159,19 +159,11 @@ class AirDbEngine(
     override fun onTransportEvent(event: TransportEvent) {
         when (event) {
             is TransportEvent.LinkConnected -> {
-                val existingSession = sessions[event.peerId]
-                if (existingSession != null) {
-                    // Duplicate connection detected for this peer.
-                    // If existing link is server-initiated and new link is client-initiated, upgrade cleanly.
-                    if (event.linkId.startsWith("client-") && existingSession.linkId.startsWith("server-")) {
-                        existingSession.stop()
-                        val session = createSession(event.peerId, event.linkId)
-                        sessions[event.peerId] = session
-                        peerLinks[event.peerId] = event.linkId
-                        session.start()
-                    }
-                    // Otherwise preserve existing authoritative link and drop duplicate
-                    return
+                val existing = sessions[event.peerId]
+                if (existing != null) {
+                    val isUpgrade = event.linkId.startsWith("client-") && existing.linkId.startsWith("server-")
+                    if (!isUpgrade) return
+                    existing.stop()
                 }
                 val session = createSession(event.peerId, event.linkId)
                 sessions[event.peerId] = session
@@ -181,11 +173,9 @@ class AirDbEngine(
 
             is TransportEvent.LinkDisconnected -> {
                 val activeLinkId = peerLinks[event.peerId]
-                if (activeLinkId == null || activeLinkId == event.linkId) {
-                    peerLinks.remove(event.peerId)
-                    val session = sessions.remove(event.peerId)
-                    session?.stop()
-                }
+                if (activeLinkId != null && activeLinkId != event.linkId) return
+                peerLinks.remove(event.peerId)
+                sessions.remove(event.peerId)?.stop()
             }
 
             is TransportEvent.PacketReceived -> {

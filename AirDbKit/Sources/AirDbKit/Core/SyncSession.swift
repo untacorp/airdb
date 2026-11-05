@@ -178,21 +178,20 @@ public actor SyncSession {
             if enforceSignatures && changes.contains(where: { !$0.verifySignature() }) {
                 return
             }
-            let valid = changes
-            if !valid.isEmpty {
-                if let maxHlc = valid.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })?.hlcTimestamp,
+            if !changes.isEmpty {
+                if let maxHlc = changes.max(by: { HlcComparator.compare($0.hlcTimestamp, $1.hlcTimestamp) == .orderedAscending })?.hlcTimestamp,
                    let parsed = HlcTimestamp.parse(maxHlc) {
                     _ = clock.update(remote: parsed)
                 }
 
-                for change in valid {
+                for change in changes {
                     if let origin = HlcComparator.extractNodeId(from: change.hlcTimestamp) {
                         vectorClock.update(nodeId: origin, hlcTimestamp: change.hlcTimestamp)
                     }
                 }
 
-                if (try? await adapter.applyChanges(valid)) != nil {
-                    onSyncCompleted(peerId, valid.count)
+                if (try? await adapter.applyChanges(changes)) != nil {
+                    onSyncCompleted(peerId, changes.count)
                 }
             }
 

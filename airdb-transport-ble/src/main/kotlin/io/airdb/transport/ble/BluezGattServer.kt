@@ -93,13 +93,8 @@ internal class BluezGattServer(
                 GattManager1::class.java
             )
 
-            // Preemptively clear any stale GATT application leftover from previously killed process
-            runCatching {
-                gattManager.UnregisterApplication(DBusPath(appPath))
-                conn.unExportObject(charPath)
-                conn.unExportObject(servicePath)
-                conn.unExportObject(appPath)
-            }
+            runCatching { gattManager.UnregisterApplication(DBusPath(appPath)) }
+            unexportAll()
 
             conn.exportObject(appPath, objManager)
             conn.exportObject(servicePath, service)
@@ -109,9 +104,7 @@ internal class BluezGattServer(
             log("gatt app registered at $appPath")
         } catch (e: Exception) {
             isRegistered.set(false)
-            conn.runCatching { unExportObject(charPath) }
-            conn.runCatching { unExportObject(servicePath) }
-            conn.runCatching { unExportObject(appPath) }
+            unexportAll()
             throw e
         }
     }
@@ -147,11 +140,14 @@ internal class BluezGattServer(
             )
             gattManager.UnregisterApplication(DBusPath(appPath))
         }
+        unexportAll()
+        log("gatt app unregistered")
+    }
 
+    private fun unexportAll() {
         conn.runCatching { unExportObject(charPath) }
         conn.runCatching { unExportObject(servicePath) }
         conn.runCatching { unExportObject(appPath) }
-        log("gatt app unregistered")
     }
 
     private class AirDbGattService(

@@ -77,13 +77,10 @@ class SyncSession(
     }
 
     fun stop() {
-        if (!isSyncing.compareAndSet(true, false)) {
-            sessionJob.cancel()
-            return
-        }
+        sessionJob.cancel()
+        if (!isSyncing.compareAndSet(true, false)) return
         currentState = State.IDLE
         lastSentBatch = null
-        sessionJob.cancel()
     }
 
     /**
@@ -171,12 +168,8 @@ class SyncSession(
 
     private fun handleDeltaBatch(packet: AirDbPacket) {
         sessionScope.launch {
-            val raw = DeltaBatch.deserialize(packet.payload)
-            if (enforceSignatures && raw.any { !it.verifySignature() }) {
-                // Reject invalid or unverified signature batches without acknowledging
-                return@launch
-            }
-            val changes = raw
+            val changes = DeltaBatch.deserialize(packet.payload)
+            if (enforceSignatures && changes.any { !it.verifySignature() }) return@launch
             if (changes.isNotEmpty()) {
                 val maxRecord = changes.maxWithOrNull(Comparator.comparing({ it.hlcTimestamp }, HlcComparator))
                 maxRecord?.let { HlcTimestamp.parseOrNull(it.hlcTimestamp) }?.let { clock.update(it) }

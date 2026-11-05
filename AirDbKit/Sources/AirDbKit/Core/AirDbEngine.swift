@@ -52,7 +52,7 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
         self.authorKeyPair = authorKeyPair
         self.enforceSignatures = enforceSignatures
 
-        if let clusterKey = clusterKey {
+        if let clusterKey {
             self.transport.setClusterKey(clusterKey)
         }
         self.transport.setListener(self)
@@ -197,13 +197,11 @@ public final class AirDbEngine: TransportListener, @unchecked Sendable {
             var oldTask: Task<Void, Never>?
             let shouldStart = lock.withScopedLock { () -> Bool in
                 if let existing = sessions[peerId], let activeLink = peerLinks[peerId] {
-                    // Duplicate connection detected: upgrade to central-initiated link if applicable
-                    if linkId.hasPrefix("central-") && activeLink.hasPrefix("peripheral-") {
-                        oldSession = existing
-                        oldTask = sessionTasks.removeValue(forKey: peerId)
-                    } else {
+                    guard linkId.hasPrefix("central-") && activeLink.hasPrefix("peripheral-") else {
                         return false
                     }
+                    oldSession = existing
+                    oldTask = sessionTasks.removeValue(forKey: peerId)
                 }
                 peerLinks[peerId] = linkId
                 return true

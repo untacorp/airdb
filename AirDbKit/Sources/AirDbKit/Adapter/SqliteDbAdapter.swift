@@ -405,12 +405,8 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
                 for item in toDelete {
                     sqlite3_reset(deleteStmt)
                     sqlite3_clear_bindings(deleteStmt)
-                    item.collection.withCString { colStr in
-                        item.id.withCString { idStr in
-                            sqlite3_bind_text(deleteStmt, 1, colStr, -1, sqliteTransient)
-                            sqlite3_bind_text(deleteStmt, 2, idStr, -1, sqliteTransient)
-                        }
-                    }
+                    sqlite3_bind_text(deleteStmt, 1, item.collection, -1, sqliteTransient)
+                    sqlite3_bind_text(deleteStmt, 2, item.id, -1, sqliteTransient)
                     if sqlite3_step(deleteStmt) != SQLITE_DONE {
                         throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
                     }
@@ -438,9 +434,7 @@ public actor SqliteDbAdapter: AirDbAdapter, AdaptiveStorageContract {
             sqlite3_bind_int(deleteChangelogStmt, 4, Int32(thresholdLc))
             sqlite3_bind_int64(deleteChangelogStmt, 5, thresholdPt)
             sqlite3_bind_int(deleteChangelogStmt, 6, Int32(thresholdLc))
-            thresholdNode.withCString { nodeStr in
-                sqlite3_bind_text(deleteChangelogStmt, 7, nodeStr, -1, sqliteTransient)
-            }
+            sqlite3_bind_text(deleteChangelogStmt, 7, thresholdNode, -1, sqliteTransient)
 
             if sqlite3_step(deleteChangelogStmt) != SQLITE_DONE {
                 throw SqliteError.stepFailed(String(cString: sqlite3_errmsg(db)))
