@@ -1,8 +1,12 @@
 <div align="center">
 
-# AirDB
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/banner.svg">
+  <img alt="AirDB Banner" src="assets/banner.svg" width="100%" style="max-width: 820px;">
+</picture>
 
-**Decentralized, Local-First P2P Database Synchronization Engine over Bluetooth Low Energy**
+<br/><br/>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0%2B-purple.svg)](https://kotlinlang.org)
