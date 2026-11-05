@@ -119,7 +119,7 @@ fun main(args: Array<String>) = runBlocking {
     }, "airdb-cli-shutdown")
     Runtime.getRuntime().addShutdownHook(shutdownHook)
 
-    println("airdb 0.2.2 (node: $nodeName, db: ${dbFile.name})")
+    println("airdb 0.2.3 (node: $nodeName, db: ${dbFile.name})")
     println("type 'help' for commands.")
     printPrompt()
 

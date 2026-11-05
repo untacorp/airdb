@@ -29,11 +29,11 @@ The central engine `AirDbEngine` is implemented as a Swift `actor`:
 `AirDbKit` is distributed as a native Swift package:
 
 * **Xcode GUI**: Select **File > Add Package Dependencies...** and enter repository URL:
-  `https://github.com/untacorp/airdb.git` (Dependency Rule: `from 0.2.2`).
+  `https://github.com/untacorp/airdb.git` (Dependency Rule: `from 0.2.3`).
 * **`Package.swift`**:
   ```swift
   dependencies: [
-      .package(url: "https://github.com/untacorp/airdb.git", from: "0.2.2")
+      .package(url: "https://github.com/untacorp/airdb.git", from: "0.2.3")
   ]
   ```
 

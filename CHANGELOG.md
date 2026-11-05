@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-11-05
+
+### Added
+- **Graceful Lifecycle & Process Recovery (`airdb-cli`, `airdb-transport-ble`)**:
+  - Registered dedicated JVM shutdown hook in `AirDbCli` to unregister BLE advertisements, release BlueZ GATT applications, and close SQLite cleanly upon receiving SIGINT or SIGTERM.
+  - Added preemptive unregistration of stale BlueZ advertisement (`/io/airdb/adv0`) and GATT application (`/io/airdb`) paths during startup, preventing `AlreadyExists` errors following abrupt process termination (`kill -9`).
+- **Connection Glare & Duplicate Link Resolution (`airdb-core`, `airdb-transport-ble`, `AirDbKit`)**:
+  - Implemented cross-role link deduplication across Kotlin and Swift: suppressed outbound Central connections when a Peripheral link exists, and dropped redundant Peripheral connection events when Central link is active.
+  - Added active link tracking (`peerLinks[peerId] = linkId`) in `AirDbEngine` with clean server-to-client link upgrade semantics when both nodes advertise and scan simultaneously.
+
+### Fixed
+- **SQLite Tombstone Compaction Consistency (`airdb-adapter-sqlite`, `AirDbKit`)**:
+  - Aligned `airdb_changelog` compaction SQL with full 3-component composite tie-breaking (`physical_time`, `logical_counter`, and `origin_node`), preventing changelog desync against `airdb_entities`.
+  - Added optional HLC threshold argument to `compact [hlc]` CLI command.
+- **Zero-Trust Delta Verification (`airdb-core`, `AirDbKit`)**:
+  - Suppressed `DELTA_ACK` dispatch in `SyncSession` if any mutation in a batch fails cryptographic signature verification when `enforceSignatures = true`.
+- **BlueZ GATT Notification Filtering (`airdb-transport-ble`)**:
+  - Filtered GATT server notifications by `targetPeerId` and wired `onNotifyStateChanged(false)` to emit `TransportEvent.LinkDisconnected`.
+
+### Refactored
+- **Kernel-Filter Cleanliness & Maintainer-Grade Polish**:
+  - Stripped syntax narration comments, flattened nesting beyond 3 indent levels, eliminated redundant aliases, and unified D-Bus unexport routines.
+  - Replaced verbose `peers.compute` with standard `peers.getOrPut` in CLI runner.
+
+---
+
+## [0.2.2] - 2026-11-05
+
+### Added
+- **Linux Desktop BLE Dual-Role Mesh Driver (`airdb-transport-ble`)**:
+  - `LinuxBleTransport`: Dual-role Central (GATT client scanning via `blessed-bluez`) and Peripheral (LE advertising & GATT server via BlueZ D-Bus).
+  - `BluezGattServer`: Native D-Bus GATT service & characteristic implementation with `PropertiesChanged` signals and custom interface omitting non-exportable `FileDescriptor` types.
+  - `BleTransportFactory`: Dynamic runtime OS detection routing to Android, Linux, or Windows with explicit platform safety checks.
+  - Automatic `writeType` negotiation detecting `WITHOUT_RESPONSE` for high-throughput mobile mesh interop.
+  - Dynamic pairing passkey agent (`onPinRequest`) preventing D-Bus `NumberFormatException` during Bluetooth LE security negotiations.
+- **Interactive Node CLI Runner (`airdb-samples/airdb-cli`)**:
+  - Standalone terminal-based interactive node runner for Linux desktop with instantaneous prompt flushing and clean Unix-grade ergonomics.
+  - Mesh and radio observability commands: `peers` (RSSI & discovery state), `links` (active GATT connections), `radio` (adapter configuration and TX/RX packet statistics), `status` (HLC and Vector Clock), and `log [on|off]` (live driver tracing).
+  - Schemaless CRUD and compaction commands: `put`, `get`, `del` (tombstone generation), `list`, `cols`, and `compact`.
+- **Persistence Enhancements (`airdb-adapter-sqlite`)**:
+  - Added `getCollections(): List<String>` method to query distinct active collection namespaces.
+
+### Changed
+- Refactored `LinuxBleTransport` under kernel-filter discipline, silencing unrequested stdout logging by default and streamlining link lifecycle transitions.
+
+---
+
 ## [0.2.1] - 2026-10-22
 
 ### Added

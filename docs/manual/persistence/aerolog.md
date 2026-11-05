@@ -72,8 +72,8 @@ The official `airdb-adapter-aerolog` module provides `AeroLogAirDbAdapter`, impl
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("io.airdb:airdb-core:0.2.2")
-    implementation("io.airdb:airdb-adapter-aerolog:0.2.2")
+    implementation("io.airdb:airdb-core:0.2.3")
+    implementation("io.airdb:airdb-adapter-aerolog:0.2.3")
 }
 ```
 
