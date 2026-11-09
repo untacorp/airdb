@@ -13,7 +13,7 @@ dependencies {
     implementation(project(":airdb-transport-ble"))
     implementation(libs.kotlin.stdlib)
     implementation(libs.coroutines.core)
-    implementation("org.slf4j:slf4j-nop:2.0.12")
+    implementation("org.slf4j:slf4j-nop:2.0.20")
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter)
