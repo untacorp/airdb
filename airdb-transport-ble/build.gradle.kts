@@ -40,7 +40,7 @@ dependencies {
     implementation(libs.coroutines.core)
 
     implementation("com.github.weliem.blessed-bluez:blessed:0.64")
-    implementation("com.github.hypfvieh:dbus-java-transport-native-unixsocket:4.3.2")
+    implementation("com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.2")
 
     if (androidJarFile != null) {
         compileOnly(files(androidJarFile))
