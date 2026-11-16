@@ -28,10 +28,10 @@ subprojects {
 
         dependencies {
             constraints {
-                add("implementation", "org.bouncycastle:bcprov-jdk18on:1.86") {
+                add("implementation", "org.bouncycastle:bcprov-jdk18on:1.87") {
                     because("Fix CVE-2026-8763 (Critical) and CVE-2026-13506 (High)")
                 }
-                add("implementation", "org.bouncycastle:bcpg-jdk18on:1.86") {
+                add("implementation", "org.bouncycastle:bcpg-jdk18on:1.87") {
                     because("Fix CVE-2026-8763 (Critical) and CVE-2026-13506 (High)")
                 }
             }
